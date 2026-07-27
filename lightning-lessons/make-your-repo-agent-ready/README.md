@@ -8,7 +8,7 @@ and fixing it with encoded rules, living docs, and adversarial reviews.
 </p>
 
 <p align="center">
-<strong>&#9654;&nbsp;Recording coming soon</strong><br>
+<a href="https://www.youtube.com/watch?v=HjBTyYJ4LH0"><strong>&#9654;&nbsp;Watch the recording on YouTube</strong></a><br>
 <sub>delivered live on July 27, 2026, with Dan Gerlanc</sub>
 </p>
 
