@@ -11,23 +11,27 @@
 
 ## The course
 
-Most AI courses teach you to prompt. This one assumes you already prompt an agent, read the diff, and accept the result. It teaches the discipline that comes next. The spine of the whole course is one sentence:
+Most AI courses teach you to prompt. This one assumes you already prompt an agent, read the diff, and accept the result. It teaches the discipline that comes next. The spine of the whole course is one method:
 
-> **Brief → Steer → Verify. You are the gate the agent can't bribe.**
+> **Define done. Brief the run. Steer the work. Verify the result.**
 
-- **Brief.** Set the goal and the bar before the agent runs.
-- **Steer.** Correct the run while it's happening. Don't let a wrong run finish.
-- **Verify.** Prove the work against something the agent can't fake. The agent never gets to mark its own homework done.
+Five outcomes, one per session:
 
-Over three weeks you build one artifact and keep it: **`prove-it`**, a practice harness that starts as a ~90-line agent loop you can hold in your head. It grows lesson by lesson into something serious: it runs the agent in a sandbox, survives `kill -9`, gates "done" behind checks the agent can't reach, and runs a roster of agents while you keep the keys.
+- **Define.** Fix the result, the boundary and the evidence before the run starts.
+- **Brief.** Give a fresh agent enough context, limits and stop conditions to start cold, with no hidden chat history.
+- **Operate.** When the premise, state or authority becomes uncertain, choose a justified action.
+- **Verify.** Make a relevant wrong result turn the evidence red. The agent never gets to mark its own homework done.
+- **Compound.** Turn one run into a retained change that makes the next run better.
+
+Over three weeks you work in one artifact and keep it: **`prove-it`**, a small TypeScript agent harness with a gate at the exit. The worker's "done" is an opinion; only `dr-gate` — 95 lines you can actually read — reruns the agreed checks and records completion. Each week you also take the same method to one real task in a repository of your own, and hand in what happened.
 
 | Week | Theme |
 |---|---|
-| Aug 3–9 | **Build it, then break it.** A tiny agent with no magic, catching it lying about "done", caging it safely, stopping a wrong run in one sentence |
-| Aug 10–16 | **Brief it, then gate it.** The right kind of brief, a "done" the agent can't fake, the gate it can't bribe, writing for the next agent who remembers nothing |
-| Aug 17–21 | **Sharpen it, then run a roster.** Context placement, delete-and-regenerate, the right model for each job, running a team of agents. Demo Day closes the cohort. |
+| Aug 3–9 | **Define it, then brief it.** What done means before the run starts, and a brief a fresh agent can start from cold. Project 1: the contracted run |
+| Aug 10–16 | **Control it, then attack it.** The control plane under the run, then attacks on your own gate and checks. Project 2: the controlled and attacked run |
+| Aug 17–21 | **Improve it, then defend it.** Better checks from your own failed runs, composed verified runs, and a live defense of the evidence. Demo Day closes the cohort |
 
-Ten live sessions (Tuesdays and Thursdays, August 3–21, 2026), taught by the SpecStory co-founders: [Greg Ceccarelli](https://maven.com/specstory) (ex-CPO Pluralsight; data at GitHub, Dropbox, and Google), Sean Johnson, and Jake Levirne. Details and enrollment on [the Maven course page](https://maven.com/specstory/hardcore-agentic-engineering-for-builders-who-ship).
+Six live sessions (Tuesdays and Thursdays, August 4–20, 2026) plus Demo Day (Friday, August 21), taught by [Greg Ceccarelli](https://maven.com/specstory) (ex-CPO Pluralsight; data at GitHub, Dropbox, and Google). Details and enrollment on [the Maven course page](https://maven.com/specstory/hardcore-agentic-engineering-for-builders-who-ship).
 
 ## The course starter: `prove-it`
 
