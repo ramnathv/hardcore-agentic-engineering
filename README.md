@@ -29,6 +29,16 @@ Over three weeks you build one artifact and keep it: **`prove-it`**, a practice 
 
 Ten live sessions (Tuesdays and Thursdays, August 3–21, 2026), taught by the SpecStory co-founders: [Greg Ceccarelli](https://maven.com/specstory) (ex-CPO Pluralsight; data at GitHub, Dropbox, and Google), Sean Johnson, and Jake Levirne. Details and enrollment on [the Maven course page](https://maven.com/specstory/hardcore-agentic-engineering-for-builders-who-ship).
 
+## The course starter: `prove-it`
+
+The practice harness students build on lives in [`prove-it/`](prove-it/): a small
+TypeScript agent loop with a gate at the exit. Zero dependencies, no API keys,
+no network — Node ≥ 22.6 runs it directly. Start with
+[`prove-it/README.md`](prove-it/README.md), then the
+[Session 0 guide](prove-it/sessions/s0-setup/README.md). The full course site —
+reader, decks and week pages — is at [hardcoreagentic.com](https://hardcoreagentic.com)
+(cohort passcode required).
+
 ## The lightning lessons
 
 Three free one-hour sessions in July 2026. Each stands alone and teaches one piece of the course's argument. Each lesson with materials gets a folder in [`lightning-lessons/`](lightning-lessons/) holding its deck and demo code.
