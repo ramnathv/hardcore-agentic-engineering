@@ -32,11 +32,11 @@ const scenario: Scenario = {
   id: 's5',
   title: 'TRACE FILED vs TRACE RETAINED AS A CASE',
   sharedFixture:
-    'the same staged demo run and its crash-boundary trace, the same convenience change — resume defaults --reconcile to ok — and the same honest holdout',
+    'Both lanes use the same trace, convenience change, and honest holdout.',
   mechanism:
-    'left opener: direct CLI agent — a real fresh reader beside the harness, a cold read with no gate · everything after, both lanes: harness + smoke worker on deterministic fixtures',
+    'The left lane starts with a live cold read. Both lanes then use deterministic fixtures inside the harness.',
   allowedCausalDifference:
-    "the right lane's evaluation pack contains the retained regression case; the left lane's does not.",
+    'The left evaluation pack omits the retained case. The right evaluation pack includes it.',
   pause: {
     question: 'Target red, holdout green. Promote, reject or revise?',
     kind: 'menu',
@@ -61,7 +61,7 @@ const scenario: Scenario = {
           'recorded 2026-08-01 from one real left-lane run (claude CLI fresh reader, then the deterministic core, real mode); local paths sanitized',
       },
     },
-    right: { label: 'TRACE RETAINED AS A CASE', promptDisplay: CHANGE_INPUT },
+    right: { label: 'TRACE RETAINED AS A CASE', promptDisplay: CHANGE_INPUT, inputLabel: 'CHANGE' },
   },
   steps: [
     // LEFT — the failed trace was filed away; outcomes are all that is left.
@@ -69,40 +69,40 @@ const scenario: Scenario = {
     {
       lane: 'left',
       frame: 'START',
-      say: 'the shared fixture, and the crash trace everyone remembers — filed away; it is not in the evaluation pack',
+      say: 'The crash trace exists, but the evaluation pack does not contain it.',
     },
     {
       lane: 'left',
-      say: 'the launcher owns staging — the demo run and its pack land in this throwaway copy',
+      say: 'The launcher stages the demo run and evaluation pack.',
       cmd: `bash ${FIX}/stage-pack.sh`,
     },
     {
       lane: 'left',
       captureRef: true,
-      say: 'the fresh-reader test — a real Claude, cold, handed the trace and asked: why did turn 2 retry? let its uncertainty sit on screen',
+      say: 'A fresh Claude reader receives only the trace. It explains turn 2 and names one uncertainty.',
       realCmd: `claude --dangerously-skip-permissions --output-format stream-json --verbose -p '${COLD_READ}'`,
     },
     {
       lane: 'left',
-      say: 'the convenience change: after a crash, resume assumes the dispatched action succeeded',
+      say: 'The change makes resume assume that the dispatched action succeeded.',
       cmd: CHANGE,
     },
     {
       lane: 'left',
       frame: 'SURPRISE',
       extract: '01-honest-pass: PASS',
-      say: 'the honest holdout — a case nobody aimed the change at:',
+      say: 'The unchanged holdout remains green.',
       cmd: `bash ${FIX}/run-case.sh 01-honest-pass`,
     },
     {
       lane: 'left',
       frame: 'CONTROL',
-      say: 'what is left to review — outcomes only: no retained case replays this change against the trace it burned',
+      say: 'No retained case tests the change against the failed trace.',
     },
     {
       lane: 'left',
       frame: 'VERDICT',
-      say: 'outcome-only review would promote — the holdout is green, and the lying trajectory has nothing left to catch it',
+      say: 'The outcome-only review would promote. The holdout is green, and no retained case exposes the false history.',
     },
 
     // RIGHT — the same trace is a replayable case; identical in both modes.
@@ -110,38 +110,38 @@ const scenario: Scenario = {
       lane: 'right',
       frame: 'START',
       extract: 'id: 03-crash-boundary',
-      say: 'the same fixture — and the failed trace retained as a replayable case in the evaluation pack:',
+      say: 'The evaluation pack retains the failed trace as a replayable case.',
       cmd: 'cat fixtures/eval/cases/03-crash-boundary.yaml',
     },
     {
       lane: 'right',
-      say: 'the same staging, the same launcher-owned copy',
+      say: 'The launcher stages the same demo run and evaluation pack.',
       cmd: `bash ${FIX}/stage-pack.sh`,
     },
     {
       lane: 'right',
-      say: 'the same convenience change, character for character',
+      say: 'This lane applies the same change.',
       cmd: CHANGE,
     },
     {
       lane: 'right',
       frame: 'SURPRISE',
       extract: '01-honest-pass: PASS',
-      say: 'the same honest holdout — green here too; the divergence is not where the room predicted it:',
+      say: 'The unchanged holdout remains green here.',
       cmd: `bash ${FIX}/run-case.sh 01-honest-pass`,
     },
     {
       lane: 'right',
       frame: 'CONTROL',
       extract: 'FAIL — phantom reconciliation',
-      say: 'the retained case replays against the changed harness — read the actor field:',
+      say: 'The retained case reads the actor field and exposes the false history.',
       cmd: `bash ${FIX}/run-case.sh 03-crash-boundary || true`,
     },
     { lane: 'right', pause: true },
     {
       lane: 'right',
       frame: 'VERDICT',
-      say: 'decision: {{answer}} — signed into the artifact; same change, same green holdout, and the only thing that told the truth was the case somebody kept',
+      say: 'Room decision: {{answer}}. The retained case caught the false history.',
     },
   ],
 };

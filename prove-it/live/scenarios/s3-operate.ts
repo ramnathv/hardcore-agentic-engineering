@@ -14,18 +14,20 @@ const BOUNDARY = 'node sessions/s3-control-plane/fixtures/effect-boundary.mjs';
 // The one intent both lanes recover from — the input the worker was executing
 // when the process died.
 const INTENT_INPUT =
-  'intent ops-5 — send_payment(to: ops, amount: 5): pay the ops ledger exactly once.\n' +
-  'the worker dispatched it; the process died before any result was recorded.';
+  'intent: ops-5\n' +
+  'action: send_payment(to: ops, amount: 5)\n' +
+  'goal: Pay the ops ledger exactly once.\n' +
+  'state: The worker dispatched the action. The process died before it recorded a result.';
 
 const scenario: Scenario = {
   id: 's3',
   title: 'BLIND RETRY vs RECONCILE BY EVIDENCE',
   sharedFixture:
-    'one payment intent and one staged crash at the effect boundary: the payment lands in the ledger, the confirmation never reaches the caller, and the run log holds a dispatched action with no recorded result',
+    'One payment lands before the process crashes. The run records the dispatch but no result.',
   mechanism:
-    'both lanes: harness + smoke worker, a staged crash, and a file-backed ledger standing in for the network — fully scripted and deterministic, so the crash lands on the same line every time; nothing live',
+    'Both lanes use the harness, the smoke worker, a staged crash, and a file-backed ledger. The result is deterministic.',
   allowedCausalDifference:
-    'the right lane inspects the world and records what it saw before resuming; the left lane fires the effect again without looking.',
+    'The left lane retries without inspection. The right lane inspects the ledger before it resumes.',
   pause: {
     question: 'You looked at the world. What can you truthfully record?',
     kind: 'menu',
@@ -41,8 +43,8 @@ const scenario: Scenario = {
     right: 'ledger: PASS',
   },
   lanes: {
-    left: { label: 'BLIND RETRY', promptDisplay: INTENT_INPUT },
-    right: { label: 'RECONCILE BY EVIDENCE', promptDisplay: INTENT_INPUT },
+    left: { label: 'BLIND RETRY', promptDisplay: INTENT_INPUT, inputLabel: 'INTENT' },
+    right: { label: 'RECONCILE BY EVIDENCE', promptDisplay: INTENT_INPUT, inputLabel: 'INTENT' },
   },
   steps: [
     // SHARED — both lanes stage the identical crashed state; recovery is the
@@ -52,7 +54,7 @@ const scenario: Scenario = {
       showOutput: true,
       frame: 'START',
       extract: 'contract=sha256',
-      say: 'the shared fixture: one send_payment request, one ledger effect, and no recorded result — the same boundary every time',
+      say: 'One payment landed. The process died before it recorded the result.',
       cmd: `${BOUNDARY} stage --run-id {{runid}}`,
     },
 
@@ -60,20 +62,20 @@ const scenario: Scenario = {
     {
       lane: 'left',
       frame: 'SURPRISE',
-      say: 'did the payment go through? the confirmation is gone and the process is dead — the blind lane does not ask',
+      say: 'The confirmation is gone. The blind lane does not inspect the ledger.',
     },
     {
       lane: 'left',
       frame: 'CONTROL',
       extract: 'sent: entry #2',
-      say: 'recovery, the naive way: a fresh attempt fires the same effect again',
+      say: 'A fresh attempt sends the same payment again.',
       cmd: `${LEDGER} send --to ops --amount 5 --ledger runs/{{runid}}-ledger.jsonl`,
     },
     {
       lane: 'left',
       frame: 'VERDICT',
       extract: 'ledger: FAIL',
-      say: 'one intent, and the world now holds:',
+      say: 'One intent now produced this ledger result.',
       cmd: `${LEDGER} assert-count --to ops --n 1 --ledger runs/{{runid}}-ledger.jsonl || true`,
     },
 
@@ -82,19 +84,19 @@ const scenario: Scenario = {
       lane: 'right',
       frame: 'SURPRISE',
       extract: '"status": "needs_reconcile"',
-      say: 'what does the machine think happened? the harness names what it does not know:',
+      say: 'The harness states what it does not know.',
       cmd: 'node src/loop.ts view {{runid}}',
     },
     {
       lane: 'right',
       frame: 'CONTROL',
       extract: 'PENDING action dispatched but never recorded',
-      say: 'the thing everyone wants to do — and the harness refuses to guess; this ledger supports ok, while in_doubt belongs to evidence that cannot settle what happened',
+      say: 'A bare resume would guess. The harness refuses and reports the pending action.',
       cmd: 'node src/loop.ts resume {{runid}} || true',
     },
     {
       lane: 'right',
-      say: 'so look at the world: the requested payment landed once, and no second payment is owed',
+      say: 'The ledger shows one payment. No second payment is due.',
       showOutput: true,
       cmd: `echo "ledger entries for to=ops: $(${LEDGER} count --to ops --ledger runs/{{runid}}-ledger.jsonl)"`,
     },
@@ -102,14 +104,14 @@ const scenario: Scenario = {
     {
       lane: 'right',
       showOutput: true,
-      say: "resume appends the decision and continues — {{answer}} was the room's call, and the actor on the record is the operator",
+      say: 'Resume records the room decision and the operator: {{answer}}.',
       cmd: `${BOUNDARY} reconcile --run-id {{runid}} --status {{answer}} && grep reconciliation runs/{{runid}}/events.jsonl`,
     },
     {
       lane: 'right',
       frame: 'VERDICT',
       extract: 'ledger: PASS',
-      say: 'one intent, and the world holds:',
+      say: 'One intent produces this ledger result.',
       cmd: `${LEDGER} assert-count --to ops --n 1 --ledger runs/{{runid}}-ledger.jsonl`,
     },
   ],

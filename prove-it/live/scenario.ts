@@ -23,14 +23,15 @@ export interface Step {
   cwdKey?: string; // subdirectory of the lane's staged copy; default: its root
   frame?: FrameName; // at most one of each per lane — the evidence discipline
   extract?: string; // regex; its first matching output line becomes the frame line
-  say?: string; // narration, printed dim; frames on say-only steps use this text
+  say?: string; // short screen narration; say-only frames use this text as evidence
   pause?: true; // run the scenario's pause here, in the pane that owns it
   showOutput?: boolean; // exceptional exhibit; normal output stays in the artifact
-  // The exact prompt/brief this step hands its worker, shown in a bordered
-  // INPUT box before the step runs. A step with promptDisplay is a worker
-  // step: its output streams as dim ● lines. Lane-wide input belongs on
+  // The exact prompt or brief this step hands its worker, shown as readable
+  // input before the step runs. A step with promptDisplay is a worker step.
+  // The screen shows compact activity. Lane-wide input belongs on
   // LaneSpec.promptDisplay instead.
   promptDisplay?: string;
+  inputLabel?: string; // short screen label such as INPUT, CONTRACT, or CHANGE
   // Replay the lane's capture file (with a labeled provenance banner) instead
   // of executing, when the current mode cannot run this step — the mock path
   // for a real-only lane, and the anchor real-mode fallback jumps to.
@@ -40,10 +41,10 @@ export interface Step {
 export interface LaneSpec {
   label: string; // names the control, not the product (e.g. EPHEMERAL CORRECTION)
   capture?: { provenance: string; path: string }; // present iff capture-backed
-  // The exact input this lane executes — the worker's prompt, or the contract
-  // that stands where a prompt would. Shown in a bordered INPUT box right
-  // after the lane banner, before anything runs.
+  // The exact input this lane executes: a worker prompt or a contract.
+  // The screen shows it before anything runs.
   promptDisplay?: string;
+  inputLabel?: string; // short screen label such as INPUT, CONTRACT, or WORKFLOW
 }
 
 export interface Scenario {

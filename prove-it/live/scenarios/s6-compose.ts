@@ -18,19 +18,20 @@ const ROLLBACK = 'git checkout -- working/ (restore the pre-workflow tree)';
 // The input both lanes execute: the declared workflow, node contracts, and the
 // one shared budget every retry spends from.
 const WORKFLOW_INPUT =
-  'workflow slug-kit-verified — inspect → implement → verify + review → join.\n' +
-  'every node closes only on a dr-gate-accepted receipt for its own contract; ' +
-  'one shared budget of 6 attempts covers every node run and every retry.';
+  'workflow: slug-kit-verified\n' +
+  'route: inspect → implement → verify + review → join\n' +
+  'completion: Each node requires a dr-gate-accepted receipt for its own contract.\n' +
+  'budget: Six attempts cover all node runs and retries.';
 
 const scenario: Scenario = {
   id: 's6',
   title: 'SUMMARY-ONLY DECISION vs EVIDENCE-BOUND JOIN',
   sharedFixture:
-    "the four-node workflow (inspect → implement → verify + review) run to four gate-accepted receipts in the staged copy, with the room's one chosen seam broken identically in both lanes",
+    'Both lanes use the same four-node workflow and four accepted receipts. The room breaks the same seam in each copy.',
   mechanism:
-    "both lanes: deterministic fixtures + harness smoke worker, keyless — the room's seam choice is the only live variable; the implement node upgrades to a real worker when the tool bridge lands",
+    'Both lanes use deterministic fixtures and the harness smoke worker. The room seam is the only live variable.',
   allowedCausalDifference:
-    "the right lane's completion rule reads receipts and recomputes the invariant; the left lane's reads summaries.",
+    'The left completion rule reads summaries. The right completion rule reads receipts and recomputes the invariant.',
   // The pause is lane 'both': the seam decision must reach BOTH staged copies
   // (each lane breaks the same seam). The left pane records the room's answer,
   // and the right pane reads it from the shared artifact. --ci uses the default.
@@ -56,32 +57,32 @@ const scenario: Scenario = {
     right: '"reason": ".+"',
   },
   lanes: {
-    left: { label: 'SUMMARY-ONLY DECISION', promptDisplay: WORKFLOW_INPUT },
-    right: { label: 'EVIDENCE-BOUND JOIN', promptDisplay: WORKFLOW_INPUT },
+    left: { label: 'SUMMARY-ONLY DECISION', promptDisplay: WORKFLOW_INPUT, inputLabel: 'WORKFLOW' },
+    right: { label: 'EVIDENCE-BOUND JOIN', promptDisplay: WORKFLOW_INPUT, inputLabel: 'WORKFLOW' },
   },
   steps: [
     // SHARED — the same starting state in both lanes, then the room's seam.
     {
       lane: 'both',
-      say: 'shared fixture — one four-node workflow, run to four gate-accepted receipts in this staged copy',
+      say: 'The staged workflow produces four gate-accepted receipts.',
       cmd: `${RUNNER} run --wf-id {{runid}}`,
     },
     {
       lane: 'left',
       frame: 'START',
-      say: 'the four node outcomes, as their own summaries — this frame will read nothing else',
+      say: 'This lane reads only the four node summaries.',
     },
     {
       lane: 'right',
       frame: 'START',
       extract: 'gate receipts on disk',
-      say: 'the same four outcomes — receipts on disk:',
+      say: 'This lane reads the four gate receipts.',
       cmd: `echo "the same four outcomes — $(ls control/receipts | grep -c '\\.json$') gate receipts on disk (control/receipts/)"; ls control/receipts`,
     },
     { lane: 'both', pause: true },
     {
       lane: 'both',
-      say: "the room's seam, broken in this lane's copy: {{answer}}",
+      say: 'The room breaks the same seam in both copies: {{answer}}.',
       cmd: `bash ${FIX}/break-seam.sh {{runid}} '{{answer}}'`,
     },
 
@@ -90,22 +91,22 @@ const scenario: Scenario = {
       lane: 'left',
       frame: 'SURPRISE',
       extract: '\\d+/4 summaries read complete',
-      say: 'the room broke {{answer}} — count the summaries that noticed:',
+      say: 'The room broke {{answer}}. Count the summaries that noticed.',
       cmd: `bash ${FIX}/node-summaries.sh {{runid}}`,
     },
     {
       lane: 'left',
       frame: 'CONTROL',
-      say: 'the completion rule in force: "summaries present" — it reads no receipt and recomputes nothing',
+      say: 'The completion rule checks only that summaries exist. It reads no receipt.',
     },
     {
       lane: 'left',
       frame: 'VERDICT',
-      say: 'completion rule: summaries present — release would proceed',
+      say: 'All summaries exist. The release would proceed.',
     },
     {
       lane: 'left',
-      say: 'labeled what it is: a decision frame derived from the summaries — nothing fake ran, and the broken seam is invisible to it',
+      say: 'This decision uses only summaries. The broken seam remains invisible.',
     },
 
     // RIGHT — the real join over the same runs, then the promotion boundary.
@@ -113,41 +114,41 @@ const scenario: Scenario = {
       lane: 'right',
       frame: 'SURPRISE',
       extract: 'join: REFUSED',
-      say: 'the real join, over the same runs — five questions in force:',
+      say: 'The evidence-bound join asks five questions about the same runs.',
       cmd: `${RUNNER} join --wf-id {{runid}} || true`,
     },
     {
       lane: 'right',
       frame: 'CONTROL',
-      say: 'the completion rule in force: the evidence-bound join — receipts read, the invariant recomputed',
+      say: 'The join reads each receipt and recomputes the invariant.',
     },
     {
       lane: 'right',
       frame: 'VERDICT',
       extract: '"reason"',
-      say: 'the refusal is durable — the join wrote its verdict to disk:',
+      say: 'The join writes its refusal to disk.',
       cmd: 'cat runs/{{runid}}/join-result.json',
     },
     {
       lane: 'right',
-      say: 'the runner restores the seam — promotion must consume fresh, honest evidence',
+      say: 'The runner restores the seam before promotion.',
       cmd: `bash ${FIX}/break-seam.sh {{runid}} restore`,
     },
     {
       lane: 'right',
       showOutput: true,
-      say: 'from workflow context, one self-promotion attempt — read the three sentences it earns:',
+      say: 'The workflow attempts to promote itself. The runner refuses.',
       cmd: `${RUNNER} promote || true`,
     },
     {
       lane: 'right',
       showOutput: true,
-      say: 'the human path — promote.sh with the owner and rollback declared before the night; read the record it writes',
+      say: 'A human promotes with a named owner and rollback path.',
       cmd: `bash ${FIX}/promote.sh {{runid}} --owner "${OWNER}" --rollback "${ROLLBACK}"`,
     },
     {
       lane: 'right',
-      say: 'promotion recorded: a named human owner and a rollback path, written before anything irreversible — the human who signs is not the engineer who built the node',
+      say: 'The promotion record names a human owner and a rollback path. The signer did not build the node.',
     },
   ],
 };

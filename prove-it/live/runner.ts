@@ -12,14 +12,9 @@
 //   --describe     print the declared causal difference and exit (the battery)
 //   --artifact DIR internal: share one artifact directory across panes
 //
-// The presentation grammar (shared by the live path and the capture path):
-//   ▌ LEFT — LABEL      lane banner, then the boxed INPUT the worker was given
-//   $ command           dim cyan, truncated — what is about to run
-//   · narration         dim — the operator's story line
-//   ● worker text       dim — the worker's own words, head+tail truncated
-//   ⏺ tool(arg)         dim cyan — the worker's tool calls
-//   ▌ FRAME   │ line    loud, colored, blank line above and below
-//   ■ ROOM DECISION     the pause: bright, ruled off, default marked
+// The presentation grammar is a readable transcript: persistent lane title,
+// exact input, compact activity, evidence frames, one room decision, and a
+// final comparison. Full commands and raw output stay in the artifact.
 import { spawn, spawnSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -38,19 +33,25 @@ import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import readline from 'node:readline';
+import {
+  cleanInlineMarkdown,
+  evidenceForScreen,
+  inputBlocks,
+  stripAnsi,
+  summarizeCommand,
+  summarizeTool,
+  wrapText,
+} from './presentation.ts';
 import type { FrameName, LaneSide, PauseSpec, Scenario, Step } from './scenario.ts';
 
 const LIVE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(LIVE, '..');
 const MARKER = '.prove-it-live-lane'; // ownership marker: cleanup refuses dirs without it
-const HEAD_LINES = 8; // worker/exhibit stream: 8 head + 3 tail + the elision line ≈ 12
-const TAIL_LINES = 3;
-const BOX_WRAP = 72; // wrap width inside the INPUT box
-const CMD_WIDTH = 88; // visible `$` lines are truncated; the full command is in the artifact
+const HEAD_LINES = 2;
+const TAIL_LINES = 1;
 
 const C = {
   reset: '\x1b[0m',
-  dim: '\x1b[2m',
   bold: '\x1b[1m',
   red: '\x1b[31m',
   green: '\x1b[32m',
@@ -66,6 +67,7 @@ const FRAME_COLOR: Record<FrameName, string> = {
   CONTROL: C.orange,
   VERDICT: C.green,
 };
+const FRAME_INDEX: Record<FrameName, number> = { START: 1, SURPRISE: 2, CONTROL: 3, VERDICT: 4 };
 const BAD = /fail(?!\s*0\b)|refus|✖|error|unexpected/i; // VERDICT (and summary) go red by content
 
 const argv = process.argv.slice(2);
@@ -211,6 +213,7 @@ interface LaneState {
   capCursor: number;
   capPlayed: number;
   unexpected: boolean;
+  activityOpen: boolean;
 }
 
 const framesMem: Record<LaneSide, Partial<Record<FrameName, string>>> = { left: {}, right: {} };
@@ -230,71 +233,122 @@ const logLane = (side: LaneSide, text: string) =>
 const interp = (s: string, lane: LaneState) =>
   s.replaceAll('{{runid}}', lane.runid).replaceAll('{{answer}}', lane.answer ?? '{{answer}}');
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim())?.trim() ?? '';
-const trunc = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const paneColumns = () => process.stdout.columns ?? 118;
+const bodyWidth = (prefixWidth = 0) => Math.max(34, Math.min(92, paneColumns() - 6) - prefixWidth);
 
-function wrapText(text: string, width: number): string[] {
-  const lines: string[] = [];
-  for (const para of text.split('\n')) {
-    if (!para.trim()) {
-      lines.push('');
+function uiSection(label: string, color = C.gray) {
+  blank();
+  show(`${C.bold}${color}${label}${C.reset}`);
+}
+
+function uiParagraph(
+  text: string,
+  options: {
+    color?: string;
+    bold?: boolean;
+    prefix?: string;
+    continuation?: string;
+    indent?: number;
+    maxLines?: number;
+  } = {},
+) {
+  const color = options.color ?? C.white;
+  const prefix = options.prefix ?? '';
+  const continuation = options.continuation ?? ' '.repeat(prefix.length);
+  const indent = ' '.repeat(options.indent ?? 2);
+  const available = bodyWidth(Math.max(prefix.length, continuation.length));
+  let lines = wrapText(text, available);
+  if (options.maxLines && lines.length > options.maxLines) {
+    lines = lines.slice(0, options.maxLines);
+    const last = lines.length - 1;
+    lines[last] = `${lines[last].slice(0, Math.max(1, available - 1))}…`;
+  }
+  let first = true;
+  for (const line of lines) {
+    if (!line) {
+      blank();
+      first = true;
       continue;
     }
-    let line = '';
-    for (const word of para.split(/\s+/)) {
-      if (line && (line + ' ' + word).length > width) {
-        lines.push(line);
-        line = word;
-      } else line = line ? `${line} ${word}` : word;
-    }
-    if (line) lines.push(line);
+    const marker = first ? prefix : continuation;
+    put(`${indent}${options.bold ? C.bold : ''}${color}${marker}${line}${C.reset}`);
+    first = false;
   }
-  return lines;
 }
 
-// ── the grammar ──
+function uiActivity(text: string, options: { color?: string; symbol?: string } = {}) {
+  uiParagraph(text, {
+    color: options.color ?? C.gray,
+    prefix: `${options.symbol ?? '•'} `,
+    continuation: '  ',
+    indent: 2,
+  });
+}
+
+function uiMeta(text: string) {
+  uiParagraph(text, { color: C.gray });
+}
+
+function openActivity(lane: LaneState, label?: string) {
+  if (lane.activityOpen) return;
+  const activityLabel = label ?? (lane.onCapture ? 'REPLAY ACTIVITY' : MODE === 'real' ? 'LIVE ACTIVITY' : 'ACTIVITY');
+  uiSection(activityLabel);
+  lane.activityOpen = true;
+}
+
 const sayLine = (side: LaneSide, text: string) => {
-  show(`${C.dim}· ${text}${C.reset}`);
+  uiParagraph(text, { color: C.gray });
   logLane(side, `· ${text}`);
 };
-const cmdLine = (cmd: string) => show(`${C.dim}${C.cyan}$ ${trunc(cmd, CMD_WIDTH)}${C.reset}`);
 
-// The INPUT box: the exact prompt/brief a lane's worker was given, shown
-// before anything runs — the dod-demo "PROMPT TO CLAUDE" moment.
-function printInputBox(side: LaneSide, text: string) {
-  const body = wrapText(text.trim(), BOX_WRAP);
-  const w = Math.max(...body.map((l) => l.length), 44);
-  blank();
-  show(`${C.gray}┌─ ${C.reset}${C.bold}${C.cyan}INPUT${C.reset}${C.gray} ${'─'.repeat(w - 6)}┐${C.reset}`);
-  for (const l of body) show(`${C.gray}│${C.reset} ${l.padEnd(w)} ${C.gray}│${C.reset}`);
-  show(`${C.gray}└${'─'.repeat(w + 2)}┘${C.reset}`);
-  blank();
-  logLane(side, `INPUT (shown boxed on screen):`);
-  for (const l of body) logLane(side, `  ${l}`);
+const cmdLine = (cmd: string) => uiActivity(summarizeCommand(cmd));
+
+// Show the exact worker input with readable line wrapping. The artifact keeps
+// the original text, including line breaks and technical names.
+function printInput(side: LaneSide, label: string, text: string) {
+  uiSection(label.toUpperCase(), C.gray);
+  const blocks = inputBlocks(text);
+  blocks.forEach((block, index) => {
+    if (block.label) {
+      uiParagraph(block.label, { color: C.gray, bold: true });
+      uiParagraph(block.text, { color: C.white, indent: 4 });
+      return;
+    }
+    uiParagraph(block.text, {
+      color: index === 0 ? C.cyan : C.white,
+      prefix: index === 0 ? '› ' : '  ',
+      continuation: '  ',
+    });
+  });
+  logLane(side, `${label.toUpperCase()} (shown on screen):`);
+  for (const line of text.split('\n')) logLane(side, `  ${line}`);
 }
 
-// One renderer for every streamed line, live or replayed — worker text gets a
-// dim ●, tool calls keep their ⏺, results their ⎿, exactly the lib.mjs shape.
+// Live and replay streams use the same compact transcript. Tool activity is a
+// bullet. Worker prose is a paragraph. Raw Markdown never reaches the screen.
 function streamLine(raw: string, mode: 'worker' | 'exhibit') {
-  const t = raw.trim();
+  const t = stripAnsi(raw).trim();
   if (!t) return;
   if (t.startsWith('$ ')) {
     cmdLine(t.slice(2));
     return;
   }
   if (t.startsWith('⏺')) {
-    show(`${C.dim}${C.cyan}⏺${C.reset}${C.dim} ${trunc(t.slice(1).trim(), 104)}${C.reset}`);
+    uiActivity(cleanInlineMarkdown(t.slice(1).trim()), { color: C.gray });
     return;
   }
   if (t.startsWith('●')) {
-    show(`${C.dim}● ${trunc(t.slice(1).trim(), 104)}${C.reset}`);
+    uiParagraph(cleanInlineMarkdown(t.slice(1).trim()), { color: C.gray, indent: 4, maxLines: 2 });
     return;
   }
   if (t.startsWith('⎿')) {
-    show(`  ${C.dim}⎿ ${trunc(t.slice(1).trim(), 100)}${C.reset}`);
+    const result = evidenceForScreen(t.slice(1).trim());
+    uiActivity(result, { color: BAD.test(result) ? C.red : C.gray, symbol: '↳' });
     return;
   }
-  if (mode === 'worker') show(`${C.dim}● ${trunc(t, 104)}${C.reset}`);
-  else show(`${C.dim}  ${trunc(t, 104)}${C.reset}`);
+  const clean = evidenceForScreen(t);
+  if (mode === 'worker') uiParagraph(clean, { color: C.gray, indent: 4, maxLines: 2 });
+  else uiActivity(clean, { color: BAD.test(clean) ? C.red : C.gray, symbol: '↳' });
 }
 
 // Head+tail throttle: at most HEAD_LINES + TAIL_LINES visible lines per step,
@@ -318,7 +372,7 @@ function makeStream(mode: 'worker' | 'exhibit') {
       }
     },
     flush() {
-      if (hidden > 0) show(`${C.dim}… ${hidden} lines … (full text in artifact)${C.reset}`);
+      if (hidden > 0) uiMeta(`… ${hidden} more lines in the artifact`);
       for (const l of held) streamLine(l, mode);
     },
   };
@@ -347,13 +401,20 @@ function claudeEventLines(raw: string, side: LaneSide): string[] | null {
   }
   if (typeof ev?.type !== 'string') return null;
   const rendered: string[] = [];
-  if (ev.type === 'system' && ev.subtype === 'init') rendered.push('● started session');
+  if (ev.type === 'system' && ev.subtype === 'init') rendered.push('⏺ Started the worker session');
   else if (ev.type === 'assistant' && ev.message?.content) {
     for (const c of ev.message.content) {
-      if (c.type === 'text' && c.text?.trim()) rendered.push('● ' + c.text.trim().split('\n')[0]);
+      if (c.type === 'text' && c.text?.trim()) {
+        const lines = String(c.text)
+          .split('\n')
+          .map((line) => cleanInlineMarkdown(line))
+          .filter(Boolean)
+          .slice(0, 3);
+        rendered.push(...lines.map((line) => `● ${line}`));
+      }
       else if (c.type === 'tool_use') {
         const arg = summarizeInput(c.input);
-        rendered.push('⏺ ' + c.name + (arg ? `(${arg})` : ''));
+        rendered.push(`⏺ ${summarizeTool(c.name, arg)}`);
       }
     }
   } else if (ev.type === 'user' && ev.message?.content) {
@@ -432,12 +493,12 @@ function execStep(
       }
       if (key.toLowerCase().includes('f')) {
         fallbackRequested = true;
-        show(`${C.yellow}${C.bold}fallback requested — stopping the live worker.${C.reset}`);
+        uiActivity('Replay requested. Stopping the live worker.', { color: C.yellow, symbol: '■' });
         stopChild();
       }
     };
     if (options.allowFallback && input.isTTY && input.setRawMode) {
-      show(`${C.dim}${C.orange}(press f to switch this live worker to its capture)${C.reset}`);
+      uiMeta('Press f to use the recorded worker instead.');
       input.setRawMode(true);
       input.resume();
       input.on('data', onInput);
@@ -467,14 +528,16 @@ function execStep(
 function replayCapture(sc: Scenario, lane: LaneState, reason: string) {
   const cap = sc.lanes[lane.side].capture;
   if (!cap) {
-    show(`${C.red}✖ no capture declared for the ${lane.side} lane — cannot fall back.${C.reset}`);
+    uiSection('REPLAY ERROR', C.red);
+    uiParagraph(`No capture exists for the ${lane.side} lane.`, { color: C.red, bold: true });
     lane.unexpected = true;
     process.exitCode = 1;
     return;
   }
   const file = resolve(ROOT, cap.path);
   if (!existsSync(file)) {
-    show(`${C.red}✖ capture missing: ${cap.path} — cannot fall back.${C.reset}`);
+    uiSection('REPLAY ERROR', C.red);
+    uiParagraph(`The capture is missing: ${cap.path}`, { color: C.red, bold: true });
     lane.unexpected = true;
     process.exitCode = 1;
     return;
@@ -488,10 +551,14 @@ function replayCapture(sc: Scenario, lane: LaneState, reason: string) {
     .join('\n')
     .replace(/^\n+/, '')
     .replace(/\n+$/, '');
-  blank();
-  show(`${C.orange}${C.bold}▌ REPLAY — capture stands in for the live worker (${reason})${C.reset}`);
-  show(`${C.dim}${C.orange}  provenance: ${cap.provenance}${C.reset}`);
-  for (const h of header) show(`${C.dim}  ${h}${C.reset}`);
+  uiSection('REPLAY', C.orange);
+  const replayMessage = MOCK && reason.includes('real-only step')
+    ? 'This mock run uses a recorded worker.'
+    : `The recorded worker replaces the live worker because ${reason}.`;
+  uiParagraph(replayMessage, { color: C.white });
+  const recorded = cap.provenance.match(/recorded ([0-9-]+)/)?.[1] ?? 'an earlier run';
+  const reader = cap.provenance.includes('fresh reader') ? 'Claude CLI fresh reader' : 'Claude CLI';
+  uiMeta(`Recorded ${recorded} · ${reader} · real capture · local paths removed`);
   appendFileSync(join(artDir, `${lane.side}.log`), body + '\n');
   appendFileSync(
     join(artDir, 'provenance.txt'),
@@ -500,16 +567,17 @@ function replayCapture(sc: Scenario, lane: LaneState, reason: string) {
       '\n',
   );
   lane.onCapture = true;
+  lane.activityOpen = false;
   lane.capLines = body.split('\n');
   lane.capCursor = 0;
   lane.capPlayed = 0;
+  setPaneTitle(sc, lane);
 }
 
 // Interleaved capture playback. Captures are self-narrating: their `· ` lines
 // are the say-lines the runner just printed live, so skip them, then play the
 // recorded lines for this step — everything up to the next narration line.
-// Worker steps show their chunk through the ● stream; frame-bearing steps show
-// the chunk's first `$` command; everything else plays silently into the
+// Worker steps show a compact chunk. Everything else plays silently into the
 // artifact. Frames keep extracting from the full capture, in step order.
 function playCaptureChunk(lane: LaneState, opts: { body?: boolean; cmds?: boolean } = {}) {
   const isSay = (l: string) => l.startsWith('· ');
@@ -553,35 +621,54 @@ function frameFromCapture(lane: LaneState, step: Step): string | null {
   return null;
 }
 
-// Frames are the loudest thing on screen: fixed label column, one color per
-// kind, breathing room above and below. VERDICT goes red or green by content.
-function emitFrame(side: LaneSide, name: FrameName, line: string) {
-  framesMem[side][name] = line;
+// Evidence frames pair one short explanation with one decisive result. The
+// artifact keeps the original result line for later inspection.
+function emitFrame(
+  sc: Scenario,
+  lane: LaneState,
+  name: FrameName,
+  line: string,
+  context?: string,
+  showEvidence = true,
+) {
+  framesMem[lane.side][name] = line;
   const color = name === 'VERDICT' && BAD.test(line) ? C.red : FRAME_COLOR[name];
-  blank();
-  show(`${C.bold}${color}▌ ${name.padEnd(8)}│ ${trunc(line, 110)}${C.reset}`);
-  blank();
-  appendFileSync(join(artDir, 'frames.txt'), `${side} ${name} │ ${line}\n`);
+  uiSection(name, color);
+  if (context) uiParagraph(context, { color: C.white });
+  if (showEvidence) {
+    const evidence = evidenceForScreen(line);
+    uiParagraph(evidence, {
+      color: name === 'VERDICT' ? color : name === 'SURPRISE' ? C.yellow : C.white,
+      bold: true,
+    });
+  }
+  lane.activityOpen = false;
+  setPaneTitle(sc, lane, name);
+  appendFileSync(join(artDir, 'frames.txt'), `${lane.side} ${name} │ ${line}\n`);
 }
 
 async function runPause(sc: Scenario, lane: LaneState) {
   const p: PauseSpec = sc.pause;
-  const rule = `${C.yellow}${'─'.repeat(56)}${C.reset}`;
-  blank();
-  show(rule);
-  show(`${C.bold}${C.yellow}■ ROOM DECISION${C.reset}`);
-  show(`${C.bold}${C.yellow}? ${p.question}${C.reset}`);
-  if (p.kind === 'menu' && p.options)
-    p.options.forEach((o, i) =>
-      show(`  ${i + 1}. ${o}${o === p.default ? `  ${C.dim}◀ default${C.reset}` : ''}`),
-    );
-  else show(`${C.dim}  free text — Enter takes the default: "${p.default}"${C.reset}`);
-  show(rule);
+  uiSection('ROOM DECISION', C.yellow);
+  uiParagraph(p.question, { color: C.white, bold: true });
+  if (p.kind === 'menu' && p.options) {
+    p.options.forEach((option, index) => {
+      const hint = option === p.default ? '  (Enter)' : '';
+      uiParagraph(`${option}${hint}`, {
+        color: option === p.default ? C.white : C.gray,
+        prefix: `${index + 1}  `,
+        continuation: '   ',
+        indent: 4,
+      });
+    });
+  } else {
+    uiMeta(`Press Enter to use: ${p.default}`);
+  }
   let answer = p.default;
   let defaultUsed = true;
   if (!CI && process.stdin.isTTY) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    const raw = (await new Promise<string>((res) => rl.question('  > ', res))).trim();
+    const raw = (await new Promise<string>((res) => rl.question(`  ${C.yellow}›${C.reset} `, res))).trim();
     rl.close();
     if (raw) {
       if (p.kind === 'menu' && p.options) {
@@ -589,7 +676,7 @@ async function runPause(sc: Scenario, lane: LaneState) {
         if (pick) {
           answer = pick;
           defaultUsed = false;
-        } else show(`${C.dim}unrecognized — taking the default '${p.default}'${C.reset}`);
+        } else uiMeta(`The answer was not recognized. Using: ${p.default}`);
       } else {
         answer = raw;
         defaultUsed = false;
@@ -597,7 +684,8 @@ async function runPause(sc: Scenario, lane: LaneState) {
     }
   } else {
     const why = CI ? '--ci' : 'no TTY';
-    show(`${C.dim}> ${answer}  (default accepted: ${why})${C.reset}`);
+    uiParagraph(answer, { color: C.white, prefix: '› ', continuation: '  ' });
+    uiMeta(`The default was accepted automatically (${why}).`);
   }
   lane.answer = answer;
   logLane(lane.side, `? ${p.question}`);
@@ -610,13 +698,14 @@ async function runPause(sc: Scenario, lane: LaneState) {
       `default-used: ${defaultUsed ? 'yes' : 'no'}\n` +
       `note: ${sc.artifactNote}\n`,
   );
-  show(`${C.dim}recorded to the artifact — an operator decision is evidence.${C.reset}`);
-  blank();
+  uiActivity(`Recorded as evidence: ${answer}`, { color: C.green, symbol: '✓' });
+  lane.activityOpen = false;
 }
 
 async function readSharedDecision(sc: Scenario, lane: LaneState) {
   const file = join(artDir, 'decision.txt');
-  show(`${C.dim}the left pane takes the room decision once; this lane waits for it.${C.reset}`);
+  uiSection('ROOM DECISION', C.yellow);
+  uiMeta('The room answers once in the left pane. This lane waits for that answer.');
   const deadline = Date.now() + 60_000;
   while (!existsSync(file) && Date.now() < deadline)
     await new Promise((resolveWait) => setTimeout(resolveWait, 100));
@@ -626,18 +715,26 @@ async function readSharedDecision(sc: Scenario, lane: LaneState) {
   if (!answer) fail(`the shared decision artifact has no answer`);
   lane.answer = answer;
   logLane(lane.side, `> ${answer} (shared room decision)`);
-  show(`${C.dim}room decision received: ${answer}${C.reset}`);
+  uiActivity(`Received the room answer: ${answer}`, { color: C.green, symbol: '✓' });
+  lane.activityOpen = false;
 }
 
-async function runLane(sc: Scenario, side: LaneSide) {
+function laneMode(lane: LaneState): string {
+  if (lane.onCapture) return 'REPLAY';
+  return MODE === 'real' ? 'LIVE' : 'MOCK';
+}
+
+function setPaneTitle(sc: Scenario, lane: LaneState, frame?: FrameName, done = false) {
+  if (!process.env.TMUX || !process.env.TMUX_PANE) return;
+  const progress = frame ? ` · ${FRAME_INDEX[frame]}/4` : '';
+  const state = done ? 'DONE' : laneMode(lane);
+  const title = `${lane.side.toUpperCase()} · ${sc.lanes[lane.side].label}   ${state}${progress}`;
+  spawnSync('tmux', ['select-pane', '-t', process.env.TMUX_PANE, '-T', title]);
+}
+
+async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
   const spec = sc.lanes[side];
-  blank();
-  put(`${C.bold}▌ ${side.toUpperCase()} — ${spec.label}${C.reset}`);
-  show(`${C.dim}mechanism: ${sc.mechanism}${C.reset}`);
-  show(`${C.dim}shared fixture: ${sc.sharedFixture}${C.reset}`);
   const stage = stageLane(sc, side);
-  show(`${C.dim}mode: ${MODE} · staged throwaway copy: ${stage}${C.reset}`);
-  appendFileSync(join(artDir, 'provenance.txt'), `${side}: mode=${MODE}\n`);
   const lane: LaneState = {
     side,
     stage,
@@ -649,30 +746,33 @@ async function runLane(sc: Scenario, side: LaneSide) {
     capCursor: 0,
     capPlayed: 0,
     unexpected: false,
+    activityOpen: false,
   };
-  // The room sees the exact input before anything runs — the dod-demo rhythm.
-  if (spec.promptDisplay) printInputBox(side, interp(spec.promptDisplay, lane));
-  // 300s: a real `claude -p` step legitimately runs for minutes. The `f` key
-  // is the fast exit; this deadline only catches a hung worker.
+  appendFileSync(join(artDir, 'provenance.txt'), `${side}: mode=${MODE} stage=${stage}\n`);
+  logLane(side, `lane: ${spec.label}`);
+  logLane(side, `mechanism: ${sc.mechanism}`);
+  logLane(side, `shared fixture: ${sc.sharedFixture}`);
+  logLane(side, `mode: ${MODE}`);
+  logLane(side, `stage: ${stage}`);
+  setPaneTitle(sc, lane);
+  if (spec.promptDisplay) printInput(side, spec.inputLabel ?? 'INPUT', interp(spec.promptDisplay, lane));
   const timeoutMs = (sc.stepTimeoutSec ?? 300) * 1000;
 
   for (const step of sc.steps) {
     if (step.lane !== 'both' && step.lane !== side) continue;
-    if (step.say) {
-      const s = interp(step.say, lane);
-      // A say-fed frame prints once, loud, as the frame — not twice.
-      if (step.frame && !step.extract) logLane(side, `· ${s}`);
-      else sayLine(side, s);
+    const context = step.say ? interp(step.say, lane) : undefined;
+    if (context) {
+      if (step.frame) logLane(side, `· ${context}`);
+      else sayLine(side, context);
     }
-    if (step.promptDisplay) printInputBox(side, interp(step.promptDisplay, lane));
+    if (step.promptDisplay)
+      printInput(side, step.inputLabel ?? 'INPUT', interp(step.promptDisplay, lane));
     if (step.pause) {
       if (step.lane === 'both' && side === 'right') await readSharedDecision(sc, lane);
       else await runPause(sc, lane);
     }
 
     const cmdText = MOCK ? (step.mockCmd ?? step.cmd) : (step.realCmd ?? step.cmd);
-    // A worker step drives (or replays) an agent: its input was boxed, its
-    // output streams as dim ● lines through the head+tail throttle.
     const isWorker = step.captureRef === true || Boolean(step.promptDisplay);
     let out: string | null = null;
     if (!lane.onCapture && cmdText) {
@@ -681,7 +781,10 @@ async function runLane(sc: Scenario, side: LaneSide) {
       const cwd = step.cwdKey ? resolve(stage, step.cwdKey) : stage;
       assertStaged(cwd, stage);
       const render = isWorker ? 'worker' : step.showOutput === true ? 'exhibit' : 'none';
-      if (render !== 'none' || step.frame) cmdLine(cmd);
+      if (render !== 'none') {
+        openActivity(lane, isWorker ? undefined : 'ACTIVITY');
+        cmdLine(cmd);
+      }
       const res = await execStep(cmd, cwd, timeoutMs, side, {
         render,
         allowFallback: !MOCK && Boolean(spec.capture) && step.captureRef === true,
@@ -694,13 +797,14 @@ async function runLane(sc: Scenario, side: LaneSide) {
           ? `timed out after ${timeoutMs / 1000}s`
           : `failed (exit ${res.code})`;
         if (!MOCK && spec.capture) {
-          show(`${C.yellow}${C.bold}■ SWITCH — real step ${why}; replaying the ${side} capture.${C.reset}`);
-          replayCapture(sc, lane, `real step ${why}`);
+          replayCapture(sc, lane, `the live step ${why}`);
           lane.capChunked = true;
+          openActivity(lane);
           playCaptureChunk(lane, { body: true, cmds: true });
-          out = null; // frames from here on come from the capture
+          out = null;
         } else {
-          show(`${C.red}✖ step ${why} — no capture for this lane; lane labeled UNEXPECTED.${C.reset}`);
+          uiSection('UNEXPECTED', C.red);
+          uiParagraph(`The step ${why}. This lane has no replay capture.`, { color: C.red, bold: true });
           lane.unexpected = true;
           process.exitCode = 1;
         }
@@ -709,49 +813,91 @@ async function runLane(sc: Scenario, side: LaneSide) {
       replayCapture(sc, lane, MOCK ? `real-only step in --mock mode` : `real-only step, real mode off`);
       if (lane.onCapture) {
         lane.capChunked = true;
+        openActivity(lane);
         playCaptureChunk(lane, { body: true, cmds: true });
       }
     } else if (lane.onCapture && lane.capChunked && (step.realCmd ?? step.cmd)) {
-      // Advance through the capture. Worker steps show their chunk; frame
-      // steps show the recorded command whose decisive line becomes the frame.
-      playCaptureChunk(lane, { body: isWorker, cmds: isWorker || Boolean(step.frame) });
+      if (isWorker) openActivity(lane);
+      playCaptureChunk(lane, { body: isWorker, cmds: isWorker });
     }
 
     if (step.frame) {
       let line: string | null = null;
       if (step.extract) {
         line = lane.onCapture && out === null ? frameFromCapture(lane, step) : matchExtract(step.extract, out ?? '');
-      } else if (step.say) {
-        line = firstLine(interp(step.say, lane));
+      } else if (context) {
+        line = firstLine(context);
       } else if (out) {
         line = firstLine(out);
       }
-      if (line) emitFrame(side, step.frame, line);
+      if (line) emitFrame(sc, lane, step.frame, line, context, Boolean(step.extract));
       else {
-        emitFrame(side, step.frame, 'UNEXPECTED — decisive line not found (full log in artifact)');
+        emitFrame(
+          sc,
+          lane,
+          step.frame,
+          'UNEXPECTED — decisive line not found (full log in artifact)',
+          context,
+        );
         lane.unexpected = true;
         process.exitCode = 1;
       }
     }
   }
-  // Nothing recorded stays hidden: flush any capture tail no step claimed.
   while (lane.capChunked && lane.capPlayed < lane.capLines.length) playCaptureChunk(lane);
-  show(`${C.dim}lane ${side} done.${C.reset}`);
+  setPaneTitle(sc, lane, 'VERDICT', true);
+  return lane;
 }
 
-function printEnd(sc: Scenario, sideBySide: boolean) {
-  if (sideBySide) {
-    blank();
-    put(`${C.bold}▌ VERDICTS — side by side${C.reset}`);
-    const width = Math.max(sc.lanes.left.label.length, sc.lanes.right.label.length);
-    const paint = (v: string) => `${C.bold}${BAD.test(v) ? C.red : C.green}${v}${C.reset}`;
-    show(`LEFT  — ${sc.lanes.left.label.padEnd(width)} │ ${paint(framesMem.left.VERDICT ?? '(no verdict)')}`);
-    show(`RIGHT — ${sc.lanes.right.label.padEnd(width)} │ ${paint(framesMem.right.VERDICT ?? '(no verdict)')}`);
-    show(`${C.dim}allowed causal difference: ${sc.allowedCausalDifference}${C.reset}`);
+function artifactScreenPath(): string {
+  const rel = relative(ROOT, artDir);
+  return rel && !rel.startsWith('..') ? rel : artDir.split(sep).pop() ?? artDir;
+}
+
+function artifactVerdicts(): Partial<Record<LaneSide, string>> {
+  const file = join(artDir, 'frames.txt');
+  if (!existsSync(file)) return {};
+  const result: Partial<Record<LaneSide, string>> = {};
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    for (const side of ['left', 'right'] as LaneSide[]) {
+      const prefix = `${side} VERDICT │ `;
+      if (line.startsWith(prefix)) result[side] = line.slice(prefix.length);
+    }
   }
+  return result;
+}
+
+function renderFinalComparison(sc: Scenario, verdicts: Partial<Record<LaneSide, string>>) {
+  uiSection('FINAL COMPARISON', C.cyan);
+  for (const side of ['left', 'right'] as LaneSide[]) {
+    uiParagraph(`${side.toUpperCase()} · ${sc.lanes[side].label}`, { color: C.gray, bold: true });
+    const verdict = evidenceForScreen(verdicts[side] ?? 'No verdict was recorded.');
+    uiParagraph(verdict, { color: BAD.test(verdict) ? C.red : C.green, bold: true, indent: 4 });
+  }
+  uiSection('ONLY DIFFERENCE');
+  uiParagraph(sc.allowedCausalDifference, { color: C.white });
   blank();
-  put(`artifact: ${artDir}`);
-  put(`replay: ${replayCommand(sc)}`);
+  uiMeta(`Artifact: ${artifactScreenPath()}`);
+  uiMeta(`Replay: ${replayCommand(sc)}`);
+}
+
+async function finishLane(sc: Scenario, lane: LaneState) {
+  if (lane.side === 'left') {
+    uiSection('DONE', C.green);
+    uiMeta('This lane is complete. The final comparison appears in the right pane.');
+    return;
+  }
+  let verdicts = artifactVerdicts();
+  if (!verdicts.left || !verdicts.right) {
+    uiSection('WAITING');
+    uiMeta('This lane is complete. Waiting for the other verdict.');
+    const deadline = Date.now() + ((sc.stepTimeoutSec ?? 300) + 30) * 1000;
+    while ((!verdicts.left || !verdicts.right) && Date.now() < deadline) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 200));
+      verdicts = artifactVerdicts();
+    }
+  }
+  renderFinalComparison(sc, verdicts);
 }
 
 // ── the battery's view: lane-specific steps against the declared difference ──
@@ -804,13 +950,25 @@ function orchestrate(sc: Scenario) {
   const ses = `prove-it-live-${sc.id}`;
   const tmux = (...args: string[]) => spawnSync('tmux', args, { encoding: 'utf8' });
   tmux('kill-session', '-t', ses);
-  tmux('new-session', '-d', '-s', ses, '-x', '240', '-y', '56');
   const flags = `${MOCK ? ' --mock' : ''}${CI ? ' --ci' : ''}`;
   const paneCmd = (side: LaneSide) =>
-    `cd '${ROOT}'; clear; NODE_NO_WARNINGS=1 node live/runner.ts ${sc.id} --lane ${side}${flags} --artifact '${artDir}'`;
-  tmux('send-keys', '-t', ses, paneCmd('left'), 'Enter');
-  tmux('split-window', '-h', '-l', '50%', '-t', ses);
-  tmux('send-keys', '-t', ses, paneCmd('right'), 'Enter');
+    `cd '${ROOT}' && env NODE_NO_WARNINGS=1 node live/runner.ts ${sc.id} --lane ${side}${flags} --artifact '${artDir}'; exec sh -c 'read -r _'`;
+  tmux('new-session', '-d', '-s', ses, '-x', '240', '-y', '56', '-n', 'compare', paneCmd('left'));
+  tmux('split-window', '-d', '-h', '-l', '50%', '-t', `${ses}:0`, paneCmd('right'));
+  tmux('set-window-option', '-t', `${ses}:0`, 'remain-on-exit', 'off');
+  tmux('set-window-option', '-t', `${ses}:0`, 'pane-border-status', 'top');
+  tmux('set-window-option', '-t', `${ses}:0`, 'pane-border-format', '#[fg=colour44,bold] #{pane_title} ');
+  tmux('set-window-option', '-t', `${ses}:0`, 'pane-border-style', 'fg=colour238');
+  tmux('set-window-option', '-t', `${ses}:0`, 'pane-active-border-style', 'fg=colour44');
+  tmux('set-window-option', '-t', `${ses}:0`, 'window-status-format', '');
+  tmux('set-window-option', '-t', `${ses}:0`, 'window-status-current-format', '');
+  tmux('set-option', '-t', ses, 'status-style', 'bg=colour233,fg=colour245');
+  tmux('set-option', '-t', ses, 'status-left-length', '80');
+  tmux('set-option', '-t', ses, 'status-right-length', '80');
+  tmux('set-option', '-t', ses, 'status-left', ` ${sc.id.toUpperCase()} · LIVE COMPARE `);
+  tmux('set-option', '-t', ses, 'status-right', ' f replay fallback · Enter choose ');
+  tmux('select-pane', '-t', `${ses}:0.0`, '-T', `LEFT · ${sc.lanes.left.label}   STARTING`);
+  tmux('select-pane', '-t', `${ses}:0.1`, '-T', `RIGHT · ${sc.lanes.right.label}   STARTING`);
   const pauseLane = sc.steps.find((step) => step.pause)?.lane;
   tmux('select-pane', '-t', `${ses}:0.${pauseLane === 'right' ? '1' : '0'}`);
   const attach = spawnSync('tmux', ['attach', '-t', ses], { stdio: 'inherit' });
@@ -832,8 +990,8 @@ async function main() {
   if (LANE) {
     artDir = artifactDir(sc);
     seedArtifact(sc, artDir);
-    await runLane(sc, LANE);
-    printEnd(sc, false);
+    const lane = await runLane(sc, LANE);
+    await finishLane(sc, lane);
     return;
   }
   if (!seqMode && !tmuxAvailable()) {
@@ -845,7 +1003,10 @@ async function main() {
   if (seqMode) {
     await runLane(sc, 'left');
     await runLane(sc, 'right');
-    printEnd(sc, true);
+    renderFinalComparison(sc, {
+      left: framesMem.left.VERDICT,
+      right: framesMem.right.VERDICT,
+    });
     return;
   }
   orchestrate(sc);

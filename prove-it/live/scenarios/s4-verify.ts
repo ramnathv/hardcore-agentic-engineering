@@ -25,19 +25,19 @@ const ADEQUACY =
 // No worker runs in this scenario — the room-seeded faulty candidate stands in
 // for one. This is the brief every green receipt in the compare certifies.
 const BRIEF_INPUT =
-  'the brief the receipts certify: working/src/slugify.mjs turns arbitrary titles ' +
-  'into url-safe slugs and the named check passes (node --test working/test/slugify.test.mjs).\n' +
-  'no worker runs in either lane — the room-seeded faulty candidate stands in for one.';
+  'outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs\n' +
+  'check: node --test working/test/slugify.test.mjs\n' +
+  'worker: No worker runs. The room-seeded faulty candidate stands in for one.';
 
 const scenario: Scenario = {
   id: 's4',
   title: 'WEAK CHECK vs ATTACKED CHECK',
   sharedFixture:
-    'the same room-selected faulty candidate seeded into both lanes — either long-title truncation or digit drop, both invisible to check-v1',
+    'Both lanes use the same room-selected faulty candidate. Check v1 cannot see the selected fault.',
   mechanism:
-    'both lanes: seeded fixtures through the real gate and the shipped adequacy script — deterministic by design, no live model in either pane; the brief-A fire runs beside this compare, on the run-sheet, not in it',
+    'Both lanes use seeded fixtures, the real gate, and the shipped adequacy script. The result is deterministic.',
   allowedCausalDifference:
-    "the right lane's check contains the property the room chose; the left lane's does not.",
+    'The left check omits the selected property. The right check includes it.',
   pause: {
     question: 'Which wrong result must this check catch?',
     kind: 'menu',
@@ -53,8 +53,8 @@ const scenario: Scenario = {
     right: 'state 3: strengthened check stays GREEN',
   },
   lanes: {
-    left: { label: 'WEAK CHECK', promptDisplay: BRIEF_INPUT },
-    right: { label: 'ATTACKED CHECK', promptDisplay: BRIEF_INPUT },
+    left: { label: 'WEAK CHECK', promptDisplay: BRIEF_INPUT, inputLabel: 'BRIEF' },
+    right: { label: 'ATTACKED CHECK', promptDisplay: BRIEF_INPUT, inputLabel: 'BRIEF' },
   },
   steps: [
     { lane: 'both', pause: true },
@@ -62,35 +62,35 @@ const scenario: Scenario = {
     // real and honest; the product is wrong; every frame is extracted output.
     {
       lane: 'left',
-      say: 'the room-selected fault: {{answer}}',
+      say: 'The room selected this fault: {{answer}}.',
       cmd: SEED,
     },
     {
       lane: 'left',
       frame: 'START',
       extract: 'working/src/slugify\\.mjs',
-      say: 'same candidate hash in both lanes — the check held at v1',
+      say: 'Both lanes use the same candidate hash. This lane keeps check v1.',
       cmd: HASH,
     },
     {
       lane: 'left',
       frame: 'SURPRISE',
       extract: '# pass \\d+',
-      say: 'the named check, over the broken product:',
+      say: 'The broken product runs against the named check.',
       cmd: 'node --test working/test/slugify.test.mjs',
     },
     {
       lane: 'left',
       frame: 'CONTROL',
       extract: 'check=check-v1',
-      say: 'nothing strengthened — the check stays v1, and the gate binds identities honestly over this exact tree',
+      say: 'The check remains at v1. The gate binds the receipt to this exact tree.',
       cmd: 'node src/loop.ts open --run-id {{runid}} && node control/dr-gate.ts check {{runid}}',
     },
     {
       lane: 'left',
       frame: 'VERDICT',
       extract: 'dr-gate: VERIFIED',
-      say: 'a valid green receipt over a broken product — identity holds, adequacy unknown',
+      say: 'The receipt is valid, but the product is wrong. Identity holds. Adequacy remains unknown.',
       cmd: 'node control/dr-gate.ts verify {{runid}}',
     },
 
@@ -98,39 +98,39 @@ const scenario: Scenario = {
     // property; the shipped pair carries it; three states from one run.
     {
       lane: 'right',
-      say: 'the same room-selected faulty candidate: {{answer}}',
+      say: 'The room selected the same faulty candidate: {{answer}}.',
       cmd: SEED,
     },
     {
       lane: 'right',
       frame: 'START',
       extract: 'working/src/slugify\\.mjs',
-      say: 'same candidate hash — only the check moves in this lane',
+      say: 'Both lanes use the same candidate hash. Only the check changes here.',
       cmd: HASH,
     },
     {
       lane: 'right',
-      say: 'the room chose {{answer}} — the supplied fault and strengthened check carry that property',
+      say: 'The supplied fault and stronger check contain the selected property: {{answer}}.',
     },
     {
       lane: 'right',
       frame: 'SURPRISE',
       extract: 'state 1: current check stays GREEN',
-      say: 'the adequacy run — the current check first, over the same fault:',
+      say: 'The current check runs against the selected fault.',
       cmd: ADEQUACY,
     },
     {
       lane: 'right',
       frame: 'CONTROL',
       extract: 'state 2: strengthened check goes RED',
-      say: 'host-installed stronger check under a new version — the same product goes red; the fault was always there, only the check moved',
+      say: 'The stronger check makes the same product fail. The fault was already present.',
       cmd: "grep 'state 2' s4-adequacy.txt",
     },
     {
       lane: 'right',
       frame: 'VERDICT',
       extract: 'state 3: strengthened check stays GREEN',
-      say: 'and green over the correct solution — the state that separates a stronger check from a paranoid one',
+      say: 'The stronger check also passes the correct solution.',
       cmd: "grep 'state 3' s4-adequacy.txt",
     },
   ],

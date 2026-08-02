@@ -12,7 +12,7 @@ const BRIEF =
 // What the harness lane executes instead of a prose prompt: the operator's
 // contract, fixed before the run opens.
 const CONTRACT_INPUT =
-  'done/contract.yaml — fixed before the run opens, sha-pinned in the manifest:\n' +
+  'file: done/contract.yaml (fixed before the run starts and pinned in the manifest)\n' +
   'outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs and the named check passes\n' +
   'check: node --test working/test/slugify.test.mjs (expect exit 0)';
 
@@ -24,13 +24,13 @@ const scenario: Scenario = {
   id: 's1',
   title: 'AGENT DECIDES DONE vs GATE DECIDES DONE',
   sharedFixture:
-    'the slugify task from the same red stub under the same frozen contract — the only thing that moves between the lanes is who says a run is finished',
+    'Both lanes start from the same red slugify stub and the same frozen contract.',
   mechanism:
-    'left: direct CLI agent, a real worker beside the harness, and the brief hands it the verdict · right: harness + smoke worker — a scripted worker inside the harness, keyless — with the real gate deciding',
+    'Left runs a direct Claude worker. Right runs the smoke worker inside the harness.',
   allowedCausalDifference:
-    "the left lane closes on the worker's own claim of done; the right lane closes only on a gate-verified receipt.",
+    "The left lane trusts the worker's DONE claim. The right lane requires a gate-verified receipt.",
   pause: {
-    question: 'Which wording belongs in the contract before the run opens?',
+    question: 'What rule must the contract contain before the run starts?',
     kind: 'text',
     default: 'only working/src/slugify.mjs may change',
   },
@@ -52,39 +52,39 @@ const scenario: Scenario = {
           'recorded 2026-08-01 from one real left-lane run (claude CLI, real mode); local paths sanitized',
       },
     },
-    right: { label: 'GATE DECIDES DONE', promptDisplay: CONTRACT_INPUT },
+    right: { label: 'GATE DECIDES DONE', promptDisplay: CONTRACT_INPUT, inputLabel: 'CONTRACT' },
   },
   steps: [
     // LEFT — real mode is one fresh `claude -p` call; mock replays the capture.
-    { lane: 'left', frame: 'START', say: 'the brief above hands the worker the verdict — it alone decides when to stop' },
+    { lane: 'left', frame: 'START', say: 'The brief lets the worker decide when the work is complete.' },
     {
       lane: 'left',
-      say: 'baseline committed — the diffstat ahead measures only what the worker does',
+      say: 'The baseline records the starting state.',
       realCmd: `git init -q && git add -A && ${COMMIT} -m baseline`,
     },
     {
       lane: 'left',
       captureRef: true,
-      say: 'one fresh claude process, the brief, nothing else — it decides when to stop',
+      say: 'A fresh Claude process receives only the brief.',
       realCmd: `claude --dangerously-skip-permissions --output-format stream-json --verbose -p '${BRIEF}'`,
     },
     {
       lane: 'left',
       frame: 'SURPRISE',
       extract: '\\d+ files? changed',
-      say: 'it said DONE and stopped — what its own verdict covers:',
+      say: 'The worker said DONE. This diff shows what changed.',
       realCmd: 'git add -A && git diff --cached --stat',
     },
     {
       lane: 'left',
       frame: 'CONTROL',
-      say: 'no independent gate certified it — now run the gate after the claim',
+      say: 'No gate certified the claim. Now the independent gate runs.',
     },
     {
       lane: 'left',
       frame: 'VERDICT',
       extract: '# fail \\d+',
-      say: 'the independent check, after the claim — an uncertified green is luck, an uncertified red shipped:',
+      say: 'The named check ran only after the DONE claim.',
       realCmd: 'node --test working/test/slugify.test.mjs || true',
     },
 
@@ -94,14 +94,14 @@ const scenario: Scenario = {
       showOutput: true,
       frame: 'START',
       extract: 'contract=sha256',
-      say: 'the same task, through the harness — the contract is fixed before the run opens',
+      say: 'The harness fixes the contract before the run starts.',
       cmd: 'node src/loop.ts run --provider smoke --run-id {{runid}}',
     },
     {
       lane: 'right',
       frame: 'SURPRISE',
       extract: 'REFUSED.*no receipt',
-      say: 'the worker believes it is done — ask the harness to close on that belief:',
+      say: 'The worker said DONE. The harness now requests completion.',
       cmd: 'node src/loop.ts complete {{runid}} || true',
     },
     { lane: 'right', pause: true },
@@ -109,25 +109,25 @@ const scenario: Scenario = {
       lane: 'right',
       frame: 'CONTROL',
       extract: 'dr-gate: ACCEPTED',
-      say: "the gate owns completion in this lane — it independently runs the named check; the room's line ({{answer}}) rides the artifact",
+      say: 'The gate runs the named check. The room answer joins the artifact: {{answer}}.',
       cmd: 'node control/dr-gate.ts check {{runid}}',
     },
     {
       lane: 'right',
       frame: 'VERDICT',
       extract: 'status=completed',
-      say: 'only a verified receipt closes the run:',
+      say: 'Only a verified receipt completes the run.',
       cmd: 'node src/loop.ts complete {{runid}}',
     },
     {
       lane: 'right',
-      say: 'inspection 1 — what a receipt binds: five fields, one signature; it proves the checks ran, not that they were any good',
+      say: 'Receipt inspection. Five fields and one signature bind the check to this run.',
       showOutput: true,
       cmd: `head -n 8 control/receipts/{{runid}}.json; grep '"sig"' control/receipts/{{runid}}.json`,
     },
     {
       lane: 'right',
-      say: 'inspection 2 — a forged receipt: every field real except sig, then ask the gate to believe it',
+      say: 'Forgery inspection. Every field is real except the signature.',
       showOutput: true,
       cmd:
         'node src/loop.ts run --provider smoke --run-id {{runid}}f >/dev/null && ' +
@@ -136,7 +136,7 @@ const scenario: Scenario = {
     },
     {
       lane: 'right',
-      say: 'inspection 3 — move the goalposts mid-run: one comment line appended to the contract after open',
+      say: 'Stale-contract inspection. One comment changes the contract after the run starts.',
       showOutput: true,
       cmd:
         'node src/loop.ts open --run-id {{runid}}g >/dev/null && ' +
