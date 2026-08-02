@@ -23,7 +23,7 @@ Five outcomes, one per session:
 - **Verify.** Make a relevant wrong result turn the evidence red. The agent never gets to mark its own homework done.
 - **Compound.** Turn one run into a retained change that makes the next run better.
 
-Over three weeks you work in one artifact and keep it: **`prove-it`**, a small TypeScript agent harness with a gate at the exit. The worker's "done" is an opinion; only `dr-gate` — 95 lines you can actually read — reruns the agreed checks and records completion. Each week you also take the same method to one real task in a repository of your own, and hand in what happened.
+Over three weeks you work in one artifact and keep it: **`prove-it`**, a small TypeScript agent harness with a gate at the exit. The worker's "done" is an opinion; only `dr-gate` — 163 lines you can actually read — reruns the agreed checks and records completion. Each week you also take the same method to one real task in a repository of your own, and hand in what happened.
 
 | Week | Theme |
 |---|---|
