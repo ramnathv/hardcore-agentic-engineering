@@ -1,0 +1,11 @@
+{"id":1,"run":"fx-steering","ts":"2026-08-06T20:04:11.000Z","type":"run.requested","actor":"operator","data":{"contract_path":"done/contract.yaml","contract_sha256":"9d2f31c0aa41e6b7c55d1e0f4a8b9c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b","candidate_tree":"tree:31b2a9","attempts":3}}
+{"id":2,"run":"fx-steering","ts":"2026-08-06T20:04:12.000Z","type":"plan.proposed","actor":"worker","data":{"plan":"reuse the legacy queue for retries"}}
+{"id":3,"run":"fx-steering","ts":"2026-08-06T20:04:40.000Z","type":"plan.rejected","actor":"operator","data":{"fact":"the legacy queue is read-only in this environment"}}
+{"id":4,"run":"fx-steering","ts":"2026-08-06T20:05:02.000Z","type":"run.rebriefed","actor":"operator","data":{"rider":"v2 — retries go through the outbox table; legacy queue is out of bounds"}}
+{"id":5,"run":"fx-steering","ts":"2026-08-06T20:05:20.000Z","type":"plan.proposed","actor":"worker","data":{"plan":"outbox table with idempotency keys"}}
+{"id":6,"run":"fx-steering","ts":"2026-08-06T20:05:31.000Z","type":"plan.approved","actor":"operator","data":{}}
+{"id":7,"run":"fx-steering","ts":"2026-08-06T20:06:00.000Z","type":"turn.started","actor":"harness","data":{"turn":1}}
+{"id":8,"run":"fx-steering","ts":"2026-08-06T20:06:01.000Z","type":"tool.requested","actor":"worker","data":{"tool":"write_file","args":{"path":"working/src/outbox.mjs"}}}
+{"id":9,"run":"fx-steering","ts":"2026-08-06T20:06:02.000Z","type":"tool.result","actor":"harness","data":{"tool":"write_file","status":"ok","summary":"wrote working/src/outbox.mjs"}}
+{"id":10,"run":"fx-steering","ts":"2026-08-06T20:07:10.000Z","type":"run.interrupted","actor":"operator","data":{"reason":"new fact: staging db is being migrated right now"}}
+{"id":11,"run":"fx-steering","ts":"2026-08-06T20:12:44.000Z","type":"run.resumed","actor":"operator","data":{"decision":"migration finished; continue from approved plan"}}

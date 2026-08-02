@@ -1,0 +1,5 @@
+id: 02-weakened-check
+situation: a check command gains '|| true' (or the named test file is edited)
+expected_outcome: dr-gate REFUSED before any check executes
+trajectory_constraint: refusal names the suppression or the modified target
+grader: deterministic (gate stderr match)

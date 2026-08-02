@@ -1,0 +1,31 @@
+# Template for eval cases 06-08. Cases 01-05 are supplied in
+# fixtures/eval/cases/ — read them first; keep the same shape.
+#
+# Rules the checker enforces (sessions/s5-operate-improve/fixtures/checks/eval-case-check.sh):
+#   - id matches the filename (e.g. id: 06-red-candidate-gated in 06-red-candidate-gated.yaml)
+#   - all five core keys present and non-empty
+#   - grader names its type: deterministic | model-based | human-adjudicated
+#   - cases 06+ carry source_trace, and the path must exist: the failed trace
+#     is PRESERVED, not summarized away
+#
+# Rules only you can enforce:
+#   - do not edit a case later to match new system behavior; write a new case
+#   - the expected_outcome is about the USER outcome, not internal mechanics
+#   - one trajectory constraint, the one that made the original failure bad
+
+id: NN-short-slug
+situation: >
+  One or two lines: the starting state and what is attempted. Concrete enough
+  that a stranger could reproduce it from the repo.
+source_trace: sessions/s5-operate-improve/fixtures/failed-trace/events.jsonl  # cases 06+: the preserved failed run
+expected_outcome: >
+  What the harness must do. For control-plane cases this is usually a refusal
+  with a named reason; for task cases, the user-visible result.
+trajectory_constraint: >
+  The one rule about HOW: what must precede what, or what must never happen,
+  even if the outcome looks right.
+grader: deterministic (exit codes / output match)  # or model-based (...) or human-adjudicated (...)
+# Optional bookkeeping — the before/after table is the canonical home for
+# baseline/after results; mirror them here only if it helps you:
+# baseline: pass | fail (date, harness commit)
+# notes:

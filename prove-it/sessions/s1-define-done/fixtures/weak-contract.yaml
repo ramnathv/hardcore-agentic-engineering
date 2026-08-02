@@ -1,0 +1,23 @@
+# DELIBERATELY WEAK contract for the S1 loophole warm-up. Same task as
+# done/contract.yaml (the slug-kit fixture), every schema key present — and it
+# would pass a schema check. Schema-complete is not attack-proof. Find the
+# loopholes with the six questions in loophole-worksheet.md before you attack a
+# contract that matters. Do NOT open a run against this file.
+outcome: the slugify function handles special characters correctly
+checks:
+  - command: node -e "import('./working/src/slugify.mjs').then(() => process.exit(0))"
+    expect_exit: 0
+  - command: node --test working/test/slugify.test.mjs || echo done anyway
+    expect_exit: 0
+runtime_observation:
+  - the function looks right when we read it
+must_change:
+  - working/src/slugify.mjs
+must_not_change:
+  - control/
+budgets:
+  attempts: 99
+  elapsed_minutes: 480
+stop_and_ask:
+  - anything unclear
+release_owner: whoever is around

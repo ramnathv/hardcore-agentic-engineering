@@ -1,0 +1,23 @@
+# Node contract — implement. The only node with a write set. Its local budget
+# draws from the workflow's SHARED budget (workflow.yaml budgets.attempts);
+# the runner enforces the shared cap, and the join recomputes it from events.
+outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs and the named check passes
+checks:
+  - command: node --test working/test/slugify.test.mjs
+    expect_exit: 0
+    retain_output: runs/<run-id>/check-output.txt
+runtime_observation:
+  - node -e "import('./working/src/slugify.mjs').then(m => console.log(m.slugify('Rock & Roll!')))" prints rock-and-roll
+must_change:
+  - working/src/slugify.mjs
+must_not_change:
+  - working/test/slugify.test.mjs
+  - control/
+  - sessions/s6-compose-defend/fixtures/
+budgets:
+  attempts: 2
+  elapsed_minutes: 20
+stop_and_ask:
+  - any need to edit working/test/ or anything under control/
+  - the tests appear wrong or under-specified
+release_owner: human

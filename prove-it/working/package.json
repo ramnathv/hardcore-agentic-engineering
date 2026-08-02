@@ -1,0 +1,9 @@
+{
+  "name": "slug-kit",
+  "private": true,
+  "type": "module",
+  "description": "The worker-owned task fixture. The named check: node --test working/test/slugify.test.mjs (run from the prove-it root).",
+  "scripts": {
+    "test": "node --test test/slugify.test.mjs"
+  }
+}

@@ -1,0 +1,43 @@
+# capture: s2 left lane — EPHEMERAL CORRECTION (two real `claude -p` runs against the thin brief)
+# recorded: 2026-08-01T23:36:36.568Z
+# mode: real
+# model: not printed in the -p transcript; worker was claude CLI 2.1.220 (Claude Code)
+$ claude --dangerously-skip-permissions -p 'Implement slugify in working/src/slugify.mjs. Make it robust and production-ready. Handle everything a real CMS would throw at it.'
+Done — `working/src/slugify.mjs` is implemented, the named check passes (3/3 tests), and the contract's runtime observation holds: `slugify('Rock & Roll!')` → `rock-and-roll`. Only the candidate file changed; tests, `control/`, and the contract are untouched.
+
+Beyond the three required behaviors (lowercase-and-dash, `&` → `and`, collapse-and-trim), the implementation handles what a real CMS would feed it:
+
+- **Diacritics and Latin extras** — NFKD normalization strips accents (`Café déjà` → `cafe-deja`), and a transliteration table covers letters NFKD can't decompose (`Søren` → `soren`, `größe Straße` → `grosse-strasse`, `Łódź` → `lodz`).
+- **Meaningful symbols become words** — `AT&T` → `at-and-t`, `100%` → `100-percent`, `+` → `plus`, plus currency signs and `™`.
+- **Non-Latin scripts survive** — Cyrillic, CJK, and Greek titles keep their letters (`Русский заголовок` → `русскии-заголовок`) instead of collapsing to an empty slug; they're valid in URL paths via percent-encoding.
+- **Junk is dropped safely** — emoji, control characters, and zero-width characters vanish; apostrophes drop without splitting the word (`don't` → `dont`); compatibility forms unfold (`ﬁne ﬂour ①②` → `fine-flour-12`); underscores, dots, slashes, and every Unicode dash act as word breaks.
+- **Defensive input handling** — `null`/`undefined` → `''`, numbers and objects are coerced; it always returns a string and never throws.
+- **Options** — `separator` (default `-`) and `maxLength`, which truncates on a word boundary and never leaves a dangling separator.
+
+One design call worth flagging: adjacent-to-emoji text like `Hello👋World` joins to `helloworld` (emoji drop silently rather than acting as a word break), which matches how the common slugify libraries behave.
+· what the thin premise bought:
+$ git add -A && git diff --cached --stat
+ working/src/slugify.mjs | 120 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 117 insertions(+), 3 deletions(-)
+· operator, to the dying conversation: "that premise is wrong: there is no real CMS — the named check in working/test/ is the entire definition of done" — and nothing durable records it
+· candidate reset to the stub — same starting state for run 2
+$ git -c user.name=demo -c user.email=demo@prove-it.local commit -q --allow-empty -m run-1 && cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs && git add -A && git -c user.name=demo -c user.email=demo@prove-it.local commit -q --allow-empty -m reset
+· run 2 — a second fresh process, the same thin brief plus nothing else
+$ claude --dangerously-skip-permissions -p 'Implement slugify in working/src/slugify.mjs. Make it robust and production-ready. Handle everything a real CMS would throw at it.'
+Done — `working/src/slugify.mjs` is implemented, the named check passes (3/3 tests, exit 0), and the contract's runtime observation holds: `slugify('Rock & Roll!')` prints `rock-and-roll`. Only the allowed file changed; tests, `control/`, and the contract are untouched.
+
+What the implementation handles, per the "real CMS" bar:
+
+- **Diacritics and Unicode**: NFKD normalization strips accents (`Café Über` → `cafe-uber`) and folds compatibility forms — ligatures (`ﬁ` → `fi`), fractions (`½` → `1-2`), roman numerals. Latin letters NFKD can't decompose get explicit fallbacks: `ß` → `ss`, `Œ` → `oe`, `ø` → `o`, `þ` → `th`, etc.
+- **Meaningful symbols spelled out**: `&` → `and`, `+` → `plus`, `@` → `at`, `%` → `percent`, `#` → `number`, `™` → `tm`, so `C++ @ 100%` → `c-plus-plus-at-100-percent`.
+- **Apostrophes removed, not split**: straight and curly quotes vanish so `Don't` → `dont`, `l’État` → `letat`.
+- **Invisible characters**: zero-width spaces/joiners, soft hyphens, and BOMs are deleted mid-word rather than becoming spurious dashes.
+- **Everything else** (em/en dashes, underscores, emoji, HTML angle brackets, non-Latin scripts) becomes a separator; runs collapse to one dash and edges are trimmed, so `  --Agentic   Engineering-- ` → `agentic-engineering`.
+- **Hostile input**: `null`/`undefined` → `''`, numbers are stringified, pure-punctuation input yields the empty slug — it never throws.
+- **Options**: `separator` (e.g. `_`) and `maxLength`, which truncates at a word boundary (`the quick brown fox` capped at 15 → `the-quick`, no trailing dash or chopped word).
+
+Per the brief, only `dr-gate` records completion — my runs were self-checks.
+· the fresh process repeats the premise:
+$ git add -A && git diff --cached --stat
+ working/src/slugify.mjs | 102 ++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 99 insertions(+), 3 deletions(-)

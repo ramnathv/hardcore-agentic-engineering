@@ -1,0 +1,23 @@
+# Node contract — review. The independent review branch is read-only: it
+# re-runs the tests in its own run and lints the implementation for smuggled
+# I/O. It shares NO write set with implement, so the branches cannot collide.
+outcome: an independent read-only review confirms the tests pass and the implementation smuggles no process or network access
+checks:
+  - command: node --test working/test/slugify.test.mjs
+    expect_exit: 0
+    retain_output: runs/<run-id>/check-output.txt
+  - command: ! grep -nE "child_process|fetch\(|https?:" working/src/slugify.mjs
+    expect_exit: 0
+runtime_observation:
+  - grep output, if any, lands in runs/<run-id>/check-output.txt as the review finding
+must_change:
+  # none - review is read-only by construction
+must_not_change:
+  - working/
+  - control/
+budgets:
+  attempts: 2
+  elapsed_minutes: 10
+stop_and_ask:
+  - the review finds a problem the verify node's checks did not (file it as a check-adequacy gap, M8-style)
+release_owner: human

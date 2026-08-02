@@ -1,0 +1,22 @@
+# Instructor-owned acceptance contract for the M1/M2 configuration exercise.
+# The first gate cannot certify its own creation: this contract judges whether
+# the student CONFIGURED prove-it correctly (operator contract written, run
+# manifest pins its hash, gate issued a receipt for it). Inspect it; do not edit.
+outcome: prove-it is configured with a fixed operator contract, a run manifest that pins its hash, and a gate-issued receipt for that run
+checks:
+  - command: bash control/checks/bootstrap-check.sh
+    expect_exit: 0
+    retain_output: runs/<run-id>/check-output.txt
+runtime_observation:
+  - dr-gate verify on the M1 run prints VERIFIED with matching contract and candidate identities
+must_change:
+  - done/contract.yaml
+  - runs/
+must_not_change:
+  - control/
+budgets:
+  attempts: 3
+  elapsed_minutes: 45
+stop_and_ask:
+  - any temptation to edit this file or the gate to make M2 pass
+release_owner: instructor

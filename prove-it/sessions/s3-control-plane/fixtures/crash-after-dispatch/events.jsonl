@@ -1,0 +1,12 @@
+{"id":1,"run":"fx-crash","ts":"2026-07-28T20:23:46.484Z","type":"run.requested","actor":"operator","data":{"contract_path":"done/contract.yaml","contract_sha256":"ceaaf355388baf8021ebc17b64c3c14dbce8ff8a0c6f19302ff966cdeb6ad1ca","candidate_tree":"tree:d62768d36a69373b863bd3a424420f3fef51972bc16edf375d716d5b1c7b2c42","attempts":3}}
+{"id":2,"run":"fx-crash","ts":"2026-07-28T20:23:46.489Z","type":"plan.proposed","actor":"worker","data":{"plan":"scripted plan from provider 'smoke'"}}
+{"id":3,"run":"fx-crash","ts":"2026-07-28T20:23:46.493Z","type":"plan.approved","actor":"operator","data":{"mode":"auto-approved in the starter; M4 makes this a real decision"}}
+{"id":4,"run":"fx-crash","ts":"2026-07-28T20:23:46.498Z","type":"turn.started","actor":"harness","data":{"turn":1}}
+{"id":5,"run":"fx-crash","ts":"2026-07-28T20:23:46.503Z","type":"message.delta","actor":"worker","data":{"text":"Reading the brief and the current implementation."}}
+{"id":6,"run":"fx-crash","ts":"2026-07-28T20:23:46.508Z","type":"tool.requested","actor":"worker","data":{"tool":"read_file","args":{"path":"working/src/slugify.mjs"}}}
+{"id":7,"run":"fx-crash","ts":"2026-07-28T20:23:46.512Z","type":"tool.result","actor":"harness","data":{"tool":"read_file","status":"ok","summary":"read working/src/slugify.mjs (200 bytes): // The candidate. Starts red on purpose: the first honest state of any run.","artifact":"working/src/slugify.mjs"}}
+{"id":8,"run":"fx-crash","ts":"2026-07-28T20:23:46.517Z","type":"turn.started","actor":"harness","data":{"turn":2}}
+{"id":9,"run":"fx-crash","ts":"2026-07-28T20:23:46.521Z","type":"message.delta","actor":"worker","data":{"text":"Writing a first implementation and running the named check."}}
+{"id":10,"run":"fx-crash","ts":"2026-07-28T20:23:46.526Z","type":"tool.requested","actor":"worker","data":{"tool":"write_file","args":{"path":"working/src/slugify.mjs","content":"export function slugify(title) {\n  return title\n    .toLowerCase()\n    .trim()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '');\n}\n"}}}
+{"id":11,"run":"fx-crash","ts":"2026-07-28T20:23:46.531Z","type":"tool.result","actor":"harness","data":{"tool":"write_file","status":"ok","summary":"wrote working/src/slugify.mjs","changed":["working/src/slugify.mjs"]}}
+{"id":12,"run":"fx-crash","ts":"2026-07-28T20:23:46.536Z","type":"tool.requested","actor":"worker","data":{"tool":"run_check","args":{}}}

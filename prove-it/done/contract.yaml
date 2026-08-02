@@ -1,0 +1,22 @@
+# Operator-authored Done Contract (M1). Fixed BEFORE the run: the run manifest
+# records this file's sha256 at open, and dr-gate refuses if it changes after.
+outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs and the named check passes
+checks:
+  - command: node --test working/test/slugify.test.mjs
+    expect_exit: 0
+    retain_output: runs/<run-id>/check-output.txt
+runtime_observation:
+  - node -e "import('./working/src/slugify.mjs').then(m => console.log(m.slugify('Rock & Roll!')))" prints rock-and-roll
+must_change:
+  - working/src/slugify.mjs
+must_not_change:
+  - working/test/slugify.test.mjs
+  - control/
+  - done/contract.yaml
+budgets:
+  attempts: 3
+  elapsed_minutes: 45
+stop_and_ask:
+  - any need to edit working/test/ or anything under control/
+  - the tests appear wrong or under-specified
+release_owner: human

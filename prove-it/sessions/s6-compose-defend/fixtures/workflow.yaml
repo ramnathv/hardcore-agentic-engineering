@@ -1,0 +1,45 @@
+# The supplied M11 workflow (S6). Four nodes, each a verified prove-it run:
+#
+#   inspect ──> implement ──> verify ─────> join ──> (human promote, OUTSIDE)
+#                    └──────> independent review ──┘
+#
+# Node completion means dr-gate accepted that node's Done Contract. The join
+# consumes receipts, never summaries. The runner can request gate runs; it has
+# no path to write the gate, the key, receipts, or the completion transition —
+# and no promote command.
+workflow: slug-kit-verified
+budgets:
+  # ONE shared budget for the whole workflow. Every node run — including every
+  # retry by any layer — spends from it. The join recomputes spending from the
+  # event logs and refuses if parent + children exceed this number.
+  attempts: 6
+retry_owner: runner
+nodes:
+  - id: inspect
+    provider: none
+    contract: sessions/s6-compose-defend/fixtures/contracts/inspect.yaml
+    depends_on:
+    write_set:
+  - id: implement
+    provider: smoke
+    contract: sessions/s6-compose-defend/fixtures/contracts/implement.yaml
+    depends_on: inspect
+    write_set: working/src/
+  - id: verify
+    provider: none
+    contract: sessions/s6-compose-defend/fixtures/contracts/verify.yaml
+    depends_on: implement
+    write_set:
+  - id: review
+    provider: none
+    contract: sessions/s6-compose-defend/fixtures/contracts/review.yaml
+    depends_on: implement
+    write_set:
+join:
+  # Fan-in is complete or it is refused. 3 of 4 receipts is "3 of 4", never
+  # "close enough". Terminal nodes must verify against the CURRENT working
+  # tree; upstream nodes are chained by candidate-tree identity.
+  requires: inspect implement verify review
+  terminal: verify review
+promotion:
+  owner: human

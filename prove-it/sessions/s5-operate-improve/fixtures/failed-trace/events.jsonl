@@ -1,0 +1,14 @@
+{"id":1,"run":"fallback","ts":"2026-07-28T20:19:09.375Z","type":"run.requested","actor":"operator","data":{"contract_path":"done/contract.yaml","contract_sha256":"ceaaf355388baf8021ebc17b64c3c14dbce8ff8a0c6f19302ff966cdeb6ad1ca","candidate_tree":"tree:d62768d36a69373b863bd3a424420f3fef51972bc16edf375d716d5b1c7b2c42","attempts":3}}
+{"id":2,"run":"fallback","ts":"2026-07-28T20:19:09.382Z","type":"plan.proposed","actor":"worker","data":{"plan":"scripted plan from provider 'smoke'"}}
+{"id":3,"run":"fallback","ts":"2026-07-28T20:19:09.386Z","type":"plan.approved","actor":"operator","data":{"mode":"auto-approved in the starter; M4 makes this a real decision"}}
+{"id":4,"run":"fallback","ts":"2026-07-28T20:19:09.394Z","type":"turn.started","actor":"harness","data":{"turn":1}}
+{"id":5,"run":"fallback","ts":"2026-07-28T20:19:09.399Z","type":"message.delta","actor":"worker","data":{"text":"Reading the brief and the current implementation."}}
+{"id":6,"run":"fallback","ts":"2026-07-28T20:19:09.403Z","type":"tool.requested","actor":"worker","data":{"tool":"read_file","args":{"path":"working/src/slugify.mjs"}}}
+{"id":7,"run":"fallback","ts":"2026-07-28T20:19:09.407Z","type":"tool.result","actor":"harness","data":{"tool":"read_file","status":"ok","summary":"read working/src/slugify.mjs (200 bytes): // The candidate. Starts red on purpose: the first honest state of any run.","artifact":"working/src/slugify.mjs"}}
+{"id":8,"run":"fallback","ts":"2026-07-28T20:19:09.412Z","type":"turn.started","actor":"harness","data":{"turn":2}}
+{"id":9,"run":"fallback","ts":"2026-07-28T20:19:09.417Z","type":"message.delta","actor":"worker","data":{"text":"Writing a first implementation and running the named check."}}
+{"id":10,"run":"fallback","ts":"2026-07-28T20:19:09.421Z","type":"tool.requested","actor":"worker","data":{"tool":"write_file","args":{"path":"working/src/slugify.mjs","content":"export function slugify(title) {\n  return title\n    .toLowerCase()\n    .trim()\n    .replace(/[^a-z0-9]+/g, '-')\n    .replace(/^-+|-+$/g, '');\n}\n"}}}
+{"id":11,"run":"fallback","ts":"2026-07-28T20:19:09.427Z","type":"tool.result","actor":"harness","data":{"tool":"write_file","status":"ok","summary":"wrote working/src/slugify.mjs","changed":["working/src/slugify.mjs"]}}
+{"id":12,"run":"fallback","ts":"2026-07-28T20:19:09.432Z","type":"tool.requested","actor":"worker","data":{"tool":"run_check","args":{}}}
+{"id":13,"run":"fallback","ts":"2026-07-28T20:19:09.588Z","type":"tool.result","actor":"harness","data":{"tool":"run_check","status":"failed","summary":"check failed (exit 1): node --test working/test/slugify.test.mjs\n# tests 3\n# suites 0\n# pass 2\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 90.529333","retryable":true,"artifact":"<PROVE_IT_ROOT>/runs/fallback/tool-output-1.txt"}}
+{"id":14,"run":"fallback","ts":"2026-07-28T20:19:09.593Z","type":"run.interrupted","actor":"operator","data":{"after_turn":2}}

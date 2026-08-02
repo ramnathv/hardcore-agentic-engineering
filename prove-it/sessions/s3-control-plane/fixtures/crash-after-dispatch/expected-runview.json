@@ -1,0 +1,20 @@
+{
+  "run": "fx-crash",
+  "status": "needs_reconcile",
+  "turns": 2,
+  "planVersion": 1,
+  "pending": {
+    "tool": "run_check",
+    "args": {},
+    "eventId": 12
+  },
+  "lastObservation": "wrote working/src/slugify.mjs",
+  "toolFailures": 0,
+  "budgets": {
+    "attempts": 3,
+    "used": 0
+  },
+  "contract": "ceaaf355388baf8021ebc17b64c3c14dbce8ff8a0c6f19302ff966cdeb6ad1ca",
+  "candidate_at_request": "tree:d62768d36a69373b863bd3a424420f3fef51972bc16edf375d716d5b1c7b2c42",
+  "receiptVerified": false
+}

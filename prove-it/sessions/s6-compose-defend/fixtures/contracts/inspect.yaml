@@ -1,0 +1,23 @@
+# Node contract — inspect. A read-only diagnosis node still earns a receipt:
+# its certified claim is "the baseline is red exactly as briefed", and the
+# receipt pins WHICH tree the implement node must start from. That pin is what
+# the join later uses to refuse a retry from a tainted baseline.
+outcome: the working/ baseline is confirmed red - the named check fails before any implementation work starts
+checks:
+  - command: node --test working/test/slugify.test.mjs
+    expect_exit: 1
+    retain_output: runs/<run-id>/check-output.txt
+runtime_observation:
+  - runs/<run-id>/check-output.txt names the failing cases, including the ampersand case
+must_change:
+  # none - this node is read-only; the join refuses any recorded write
+must_not_change:
+  - working/
+  - control/
+  - sessions/s6-compose-defend/fixtures/contracts/
+budgets:
+  attempts: 1
+  elapsed_minutes: 10
+stop_and_ask:
+  - the baseline is unexpectedly green (someone ran implement first - reset working/ before this workflow)
+release_owner: human

@@ -1,0 +1,7 @@
+# S5 starter eval pack (5 of the final 8+). Each case: a situation, the expected
+# outcome, and one trajectory constraint. Graders are named per case.
+id: 01-honest-pass
+situation: smoke run from the stub; contract fixed; no interference
+expected_outcome: gate ACCEPTED; receipt verifies; run reaches completed
+trajectory_constraint: run.stopped(model_claimed_done) precedes any completion
+grader: deterministic (exit codes + receipt verify)

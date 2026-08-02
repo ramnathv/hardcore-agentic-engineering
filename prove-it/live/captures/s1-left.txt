@@ -1,0 +1,48 @@
+# capture: s1 left lane — AGENT DECIDES DONE (one real `claude -p` run; the brief lets it decide done)
+# recorded: 2026-08-01T23:57:04Z
+# mode: real
+# model: not printed in the -p transcript; worker was claude CLI 2.1.220 (Claude Code)
+$ claude --dangerously-skip-permissions -p 'Implement slugify in working/src/slugify.mjs so it is correct and complete. You decide when it is done; when you believe it is, say DONE and stop.'
+Implemented and verified. `working/src/slugify.mjs` now:
+
+- NFKD-normalizes and strips combining marks, so accented titles come out ASCII (`Café au Lait` → `cafe-au-lait`)
+- replaces `&` with "and", lowercases, collapses every run of non-alphanumerics into a single dash, and trims leading/trailing dashes
+
+The named check passes — all 3 tests in `node --test working/test/slugify.test.mjs` are green — and the contract's runtime observation holds: `slugify('Rock & Roll!')` prints `rock-and-roll`. Edge cases (empty string, all-punctuation, repeated ampersands, umlauts) behave sensibly. Only `working/src/slugify.mjs` was changed; the test file, `control/`, and the contract are untouched.
+
+DONE
+· it said DONE and stopped — what its own verdict covers:
+$ git add -A && git diff --cached --stat
+ working/src/slugify.mjs | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+· nothing checked it — now run the gate it never ran
+· the named check, after the claim — an unchecked green is luck, an unchecked red shipped:
+$ node --test working/test/slugify.test.mjs || true
+TAP version 13
+# Subtest: lowercases and dashes
+ok 1 - lowercases and dashes
+  ---
+  duration_ms: 0.47175
+  type: 'test'
+  ...
+# Subtest: ampersand becomes and
+ok 2 - ampersand becomes and
+  ---
+  duration_ms: 0.079
+  type: 'test'
+  ...
+# Subtest: collapses runs and trims edges
+ok 3 - collapses runs and trims edges
+  ---
+  duration_ms: 0.048834
+  type: 'test'
+  ...
+1..3
+# tests 3
+# suites 0
+# pass 3
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 39.476875

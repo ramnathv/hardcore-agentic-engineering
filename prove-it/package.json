@@ -1,0 +1,16 @@
+{
+  "name": "prove-it",
+  "private": true,
+  "type": "module",
+  "description": "The Hardcore Agentic Engineering course harness. Zero runtime dependencies; the smoke provider needs no keys.",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "green": "bash scripts/green-check.sh",
+    "smoke": "node src/loop.ts run --provider smoke",
+    "tamper": "bash scripts/tamper-table.sh",
+    "probe": "bash scripts/probe.sh",
+    "test": "NODE_NO_WARNINGS=1 node --test 'tests/*.test.ts'"
+  }
+}

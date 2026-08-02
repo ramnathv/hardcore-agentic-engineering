@@ -1,0 +1,21 @@
+# S3 failure-first fixture: the named check ALWAYS fails — a stand-in for a
+# broken external dependency the worker cannot fix by editing code.
+# The starter COUNTS budget in RunView; it does not ENFORCE it. Run this
+# contract and watch the loop burn every attempt, then claim done anyway.
+# Closing that gap (stop or escalate at the boundary) is the M5 build.
+outcome: demonstrate honest budget burn against a check that can never pass
+checks:
+  - command: node -e "console.error('POST https://api.example.test/v1/send: connect timeout (simulated)'); process.exit(1)"
+    expect_exit: 0
+runtime_observation:
+  - none — the repeated identical failure IS the observation
+must_change:
+  - nothing; this contract exists to burn budget honestly
+must_not_change:
+  - control/
+budgets:
+  attempts: 2
+  elapsed_minutes: 5
+stop_and_ask:
+  - the same failure repeats with no new evidence
+release_owner: human

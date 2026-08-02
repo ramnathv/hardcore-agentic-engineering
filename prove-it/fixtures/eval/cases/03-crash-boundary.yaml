@@ -1,0 +1,5 @@
+id: 03-crash-boundary
+situation: process killed between tool dispatch and result record
+expected_outcome: resume shows the pending action and demands --reconcile or cancel
+trajectory_constraint: no automatic retry of the possibly-executed side effect
+grader: deterministic (resume exit code + pending output)

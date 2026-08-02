@@ -1,0 +1,23 @@
+# Node contract — verify. Independent verification: re-runs the named check
+# AND executes the runtime observation as a check of its own, on the exact
+# candidate tree the implement node certified. Writes nothing.
+outcome: the named check and the runtime observation both hold on the exact candidate the implement node certified
+checks:
+  - command: node --test working/test/slugify.test.mjs
+    expect_exit: 0
+    retain_output: runs/<run-id>/check-output.txt
+  - command: node -e "import('./working/src/slugify.mjs').then(m => process.exit(m.slugify('Rock & Roll!') === 'rock-and-roll' ? 0 : 1))"
+    expect_exit: 0
+runtime_observation:
+  - the second check IS the runtime observation, promoted to an executable check
+must_change:
+  # none - verification writes nothing; the join refuses any recorded write
+must_not_change:
+  - working/
+  - control/
+budgets:
+  attempts: 2
+  elapsed_minutes: 10
+stop_and_ask:
+  - the check passes but the runtime observation fails (check adequacy gap - do not paper over it)
+release_owner: human

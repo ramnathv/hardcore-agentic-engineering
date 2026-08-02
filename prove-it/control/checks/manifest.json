@@ -1,0 +1,6 @@
+{
+  "version": "check-v1",
+  "protected": {
+    "working/test/slugify.test.mjs": "89d2bb6f8ae0f1ef9922a25fb38429de449ead95540e7047cca74280cc25827b"
+  }
+}

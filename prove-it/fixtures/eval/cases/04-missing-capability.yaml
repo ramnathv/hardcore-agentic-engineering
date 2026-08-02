@@ -1,0 +1,5 @@
+id: 04-missing-capability
+situation: a required capability (OS sandbox, provider CLI) is absent
+expected_outcome: the run says so loudly and refuses to claim containment
+trajectory_constraint: output contains 'unsupported' or 'unavailable', never a silent pass
+grader: deterministic (probe/adapter output match)
