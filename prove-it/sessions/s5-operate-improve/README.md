@@ -51,7 +51,7 @@ The left lane files a failed trace but does not keep a runnable case. Its holdou
 
 The right lane keeps the same trace as a regression case. The case catches a false operator event that the passing holdout misses.
 
-The fresh-reader opening uses a real Claude CLI in live mode. The rest of both lanes uses deterministic fixtures and the scripted demo agent.
+In live mode a real Claude reads the trace cold, and a real evaluator reviews each lane's pack and returns a one-word decision. The staging, the change, and the case runs are deterministic fixtures in both modes; your `--mock` copy replays a sanitized recording of the reader.
 
 ### Decide
 

@@ -22,13 +22,17 @@ const CONTRACT_INPUT =
   'outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs and the named check passes\n' +
   'check: node --test working/test/slugify.test.mjs (expect exit 0)';
 
+const CLI = 'node live/runtime/cli.ts';
+const PREFIX_ART = '{{artifact}}/prefix';
+const STOP_AT_WRITE = 'PROVE_IT_LIVE_INTERRUPT_AT_TOOL=write_file';
+
 const scenario: Scenario = {
   id: 's2',
   title: 'EPHEMERAL CORRECTION vs DURABLE RUN EVENT',
   sharedFixture:
     'Both lanes start from the same slugify task and the same thin CMS premise.',
   mechanism:
-    'Left runs a direct Claude worker. Right runs the smoke worker inside the harness.',
+    'Mock: a recorded left-lane worker and the keyless smoke worker. Real: one Claude agent, interrupted after its first successful write, and two continuations of that same interrupted run.',
   allowedCausalDifference:
     'The left correction dies with the conversation. The right correction becomes a durable run event.',
   pause: {
@@ -38,12 +42,12 @@ const scenario: Scenario = {
     default: 'steer',
   },
   evidenceNote:
-    'left: two diffstats repeating the same breadth across a dead correction · right: an interrupted status, an appended resume, and a receipt-verified completion',
+    'left: the correction said to a process that ended, and absent from what the next one is given · right: the same correction recorded as a durable event, and present in the conversation the resumed worker receives',
   artifactNote:
-    'the log recorded that you stopped it, not why — the fact rides in this artifact until the P3 build.',
+    'the artifact records the exact input each process was started with, so "did the correction reach the worker" is answered by the evidence rather than by the narration.',
   expectedVerdicts: {
-    left: '\\d+ files? changed',
-    right: 'status=completed',
+    left: '\\d+ files? changed|steer: ABSENT',
+    right: 'status=completed|steer: PRESENT',
   },
   lanes: {
     left: {
@@ -58,8 +62,9 @@ const scenario: Scenario = {
     right: { label: 'DURABLE RUN EVENT', promptDisplay: CONTRACT_INPUT, inputLabel: 'CONTRACT' },
   },
   steps: [
-    // LEFT — real mode is two fresh `claude -p` calls; mock replays the capture.
-    { lane: 'left', frame: 'START', say: 'The same thin brief starts both runs.' },
+    // LEFT — mock replays the recorded worker. Real runs the shared prefix in
+    // this pane, then forks a lane that kept no record of the correction.
+    { lane: 'left', say: 'The same thin brief starts both runs.' },
     {
       lane: 'left',
       say: 'The baseline records the starting state.',
@@ -68,55 +73,67 @@ const scenario: Scenario = {
     {
       lane: 'left',
       captureRef: true,
-      say: 'A fresh Claude process receives only the thin brief.',
-      realCmd: `claude --dangerously-skip-permissions --output-format stream-json --verbose -p '${BRIEF}'`,
+      // START lives here, not earlier: it is the first moment both lanes can
+      // be at. The right lane cannot reach its own START until this step has
+      // published the shared prefix, so a frame barrier before this point is a
+      // barrier one lane can never arrive at.
+      frame: 'START',
+      extract: 'record:\\s+dropped|slugify',
+      say: 'A worker receives only the thin brief, and is stopped after its first successful write.',
+      realCmd:
+        `${STOP_AT_WRITE} ${CLI} claude --task slugify ` +
+        `--run-id {{shared}} --artifact ${PREFIX_ART} --timeout 240; ` +
+        `${CLI} fork --from ${PREFIX_ART} --to {{artifact}}/left --run-id {{runid}} --drop-events`,
+      signals: 'prefix',
     },
     {
       lane: 'left',
       frame: 'SURPRISE',
-      extract: '\\d+ files? changed',
-      say: 'The thin premise produces this change.',
-      realCmd: 'git add -A && git diff --cached --stat',
+      extract: '\\d+ files? changed|durable events in this lane: \\d+',
+      say: 'The thin brief produced work, and then the run stopped. This lane kept nothing.',
+      realCmd:
+        `git add -A && ${COMMIT} -m run-1; ` +
+        `echo "durable events in this lane: $(wc -l < {{artifact}}/left/shared/events.jsonl 2>/dev/null || echo 0)"`,
     },
     {
       lane: 'left',
       frame: 'CONTROL',
-      say: `The operator says, "${FACT}." The process ends without recording this fact.`,
-    },
-    {
-      lane: 'left',
-      say: 'The candidate returns to the original stub.',
-      realCmd: `${COMMIT} -m run-1 && cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs && git add -A && ${COMMIT} -m reset`,
+      say: 'The correction is given to the process. The process then ends.',
     },
     {
       lane: 'left',
       captureRef: true,
-      say: 'A second fresh process receives the same thin brief.',
-      realCmd: `claude --dangerously-skip-permissions --output-format stream-json --verbose -p '${BRIEF}'`,
+      say: 'A fresh worker starts. It receives the original brief, because that is all there is.',
+      realCmd:
+        `${CLI} claude --task slugify --run-id {{runid}} ` +
+        `--reuse-stage $TMPDIR/prove-it-live/{{runid}} --artifact {{artifact}}/left --timeout 240`,
     },
     {
       lane: 'left',
       frame: 'VERDICT',
-      extract: '\\d+ files? changed',
-      say: 'The new process repeats the original premise.',
-      realCmd: 'git add -A && git diff --cached --stat',
+      extract: '\\d+ files? changed|steer: (PRESENT|ABSENT)',
+      say: 'This is what the second worker was actually given.',
+      realCmd: `${CLI} audit {{artifact}}/left --expect "${FACT}"`,
     },
 
-    // RIGHT — all mechanism; identical in both modes, keyless.
+    // RIGHT — the same interrupted run, with the correction recorded.
     {
       lane: 'right',
+      awaits: 'prefix',
       showOutput: true,
       frame: 'START',
-      extract: 'contract=sha256',
+      extract: 'contract=sha256|record:\\s+carried forward',
       say: 'The harness fixes the contract before the run starts.',
-      cmd: 'node src/loop.ts run --provider smoke --run-id {{runid}} --interrupt-after 2',
+      mockCmd: 'node src/loop.ts run --provider smoke --run-id {{runid}} --interrupt-after 2',
+      realCmd: `${CLI} fork --from ${PREFIX_ART} --to {{artifact}}/right --run-id {{runid}}`,
     },
     {
       lane: 'right',
       frame: 'SURPRISE',
-      extract: '"status"',
+      extract: '"status"|status\\s+interrupted',
       say: 'The process is gone. The run state remains.',
-      cmd: 'node src/loop.ts view {{runid}}',
+      mockCmd: 'node src/loop.ts view {{runid}}',
+      realCmd: `${CLI} view {{artifact}}/right`,
     },
     { lane: 'right', pause: true },
     {
@@ -132,22 +149,25 @@ const scenario: Scenario = {
     {
       lane: 'right',
       frame: 'CONTROL',
-      extract: 'status=needs_evidence',
-      say: 'Resume appends run.resumed. It continues from durable state after the room chose {{answer}}.',
-      cmd: 'node src/loop.ts resume {{runid}}',
+      extract: 'status=needs_evidence|recorded a durable steer',
+      say: 'The room chose {{answer}}. It is recorded as a run event, not said to a process.',
+      mockCmd: 'node src/loop.ts resume {{runid}}',
+      realCmd: `${CLI} steer {{artifact}}/right --text "${FACT}" && ${CLI} resume {{artifact}}/right`,
     },
-    { lane: 'right', cmd: 'node control/dr-gate.ts check {{runid}}' },
+    { lane: 'right', mockCmd: 'node control/dr-gate.ts check {{runid}}' },
     {
       lane: 'right',
       frame: 'VERDICT',
-      extract: 'status=completed',
-      cmd: 'node src/loop.ts complete {{runid}}',
+      extract: 'status=completed|steer: (PRESENT|ABSENT)',
+      say: 'This is what the resumed worker was actually given.',
+      mockCmd: 'node src/loop.ts complete {{runid}}',
+      realCmd: `${CLI} audit {{artifact}}/right --expect "${FACT}"`,
     },
     {
       lane: 'right',
       say: 'This hand-written log is an exhibit. The M4 build adds live plan rejection.',
       showOutput: true,
-      cmd: 'bash sessions/s2-brief-steer/fixtures/make-steering-run.sh >/dev/null && grep plan.rejected runs/fx-steering/events.jsonl || true',
+      mockCmd: 'bash sessions/s2-brief-steer/fixtures/make-steering-run.sh >/dev/null && grep plan.rejected runs/fx-steering/events.jsonl || true',
     },
   ],
 };

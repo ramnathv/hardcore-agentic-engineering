@@ -71,11 +71,11 @@ During the instructor demo, watch and predict. There is nothing to type. Run the
 
 Both lanes start with the same contract, task, and checked files.
 
-In the instructor's live run, `AGENT DECIDES DONE` uses a real agent. The run stops when that agent claims completion.
+In the instructor's live run, `AGENT DECIDES DONE` uses a real agent that cannot run or read the named check. The run stops when that agent claims completion.
 
 The `--mock` command below replays a sanitized capture of the real-agent lane.
 
-In `GATE DECIDES DONE`, only the gate can record completion. This lane uses a scripted demo agent and the real gate.
+In `GATE DECIDES DONE`, only the gate can record completion. In the live run this lane continues the same worker's run under the real gate; your `--mock` copy uses a scripted demo agent and the same gate.
 
 The **gate** is the course command that runs the checks and creates a signed result.
 

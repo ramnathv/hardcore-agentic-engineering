@@ -8,6 +8,27 @@
 import type { Scenario } from '../scenario.ts';
 
 const FIX = 'sessions/s5-operate-improve/fixtures';
+const CLI = 'node live/runtime/cli.ts';
+const CASES = 's5-cases.txt';
+
+// The pack, counted from its own recorded output. This is the decisive
+// evidence: what the pack contained, and what it caught.
+const PACK_SUMMARY =
+  `node -e "const t=require('fs').readFileSync('${CASES}','utf8');` +
+  `const f=(t.match(/FAIL/g)||[]).length;const p=(t.match(/: PASS/g)||[]).length;` +
+  `console.log('pack: '+(p+f)+' case'+(p+f===1?'':'s')+' run, '+f+' failure'+(f===1?'':'s'))"`;
+
+// A real evaluator, handed exactly what its lane's pack produced. Its decision
+// is required to be one of three words, so the screen reads data rather than
+// prose — and it is shown after the evidence, because it is secondary to it.
+const EVALUATE = (lane: string) =>
+  `${CLI} claude --run-id {{runid}} --decision-schema --tools read_file ` +
+  `--artifact {{artifact}}/${lane} --timeout 200 --brief ` +
+  `"Evaluate this change: after a crash, resume assumes the dispatched action succeeded ` +
+  `(--reconcile defaults to 'ok'). Evaluation pack results: $(cat ${CASES}). Decide." ` +
+  // Only the decision reaches the screen. The evaluator's whole run is in the
+  // artifact, and its reasoning is not what the comparison turns on.
+  `| grep '^decision:'`;
 
 // The convenience change, verbatim from the session page (portable -i.bak):
 // after a crash, resume assumes the dispatched action succeeded.
@@ -48,8 +69,8 @@ const scenario: Scenario = {
   artifactNote:
     'the artifact records which case caught the lie and what the room decided — it proves nothing about the next change; retaining the right case from your own history is Project 3.',
   expectedVerdicts: {
-    left: 'outcome-only review would promote',
-    right: 'decision: (promote|reject|revise)',
+    left: 'outcome-only review would promote|pack: 1 case run, 0 failures',
+    right: 'decision: (promote|reject|revise)|pack: 2 cases run, 1 failure',
   },
   lanes: {
     left: {
@@ -80,7 +101,7 @@ const scenario: Scenario = {
       lane: 'left',
       captureRef: true,
       say: 'A fresh Claude reader receives only the trace. It explains turn 2 and names one uncertainty.',
-      realCmd: `claude --dangerously-skip-permissions --output-format stream-json --verbose -p '${COLD_READ}'`,
+      realCmd: `bash live/providers/raw-worker.sh '${COLD_READ}'`,
     },
     {
       lane: 'left',
@@ -92,12 +113,27 @@ const scenario: Scenario = {
       frame: 'SURPRISE',
       extract: '01-honest-pass: PASS',
       say: 'The unchanged holdout remains green.',
-      cmd: `bash ${FIX}/run-case.sh 01-honest-pass`,
+      cmd: `bash ${FIX}/run-case.sh 01-honest-pass 2>&1 | tee -a ${CASES}`,
     },
     {
       lane: 'left',
       frame: 'CONTROL',
       say: 'No retained case tests the change against the failed trace.',
+    },
+    {
+      lane: 'left',
+      showOutput: true,
+      say: 'An evaluator reviews the change with this pack, and nothing else.',
+      realCmd: EVALUATE('left'),
+    },
+    {
+      // Real-only, and shown: the pack counted from its own output. The left
+      // lane replays a capture in mock, and a capture-bound lane runs no
+      // further commands — so this evidence cannot live in the frame below.
+      lane: 'left',
+      showOutput: true,
+      say: 'This is what the pack contained.',
+      realCmd: PACK_SUMMARY,
     },
     {
       lane: 'left',
@@ -128,20 +164,29 @@ const scenario: Scenario = {
       frame: 'SURPRISE',
       extract: '01-honest-pass: PASS',
       say: 'The unchanged holdout remains green here.',
-      cmd: `bash ${FIX}/run-case.sh 01-honest-pass`,
+      cmd: `bash ${FIX}/run-case.sh 01-honest-pass 2>&1 | tee -a ${CASES}`,
     },
     {
       lane: 'right',
       frame: 'CONTROL',
       extract: 'FAIL — phantom reconciliation',
       say: 'The retained case reads the actor field and exposes the false history.',
-      cmd: `bash ${FIX}/run-case.sh 03-crash-boundary || true`,
+      cmd: `bash ${FIX}/run-case.sh 03-crash-boundary 2>&1 | tee -a ${CASES}; true`,
     },
     { lane: 'right', pause: true },
     {
       lane: 'right',
+      showOutput: true,
+      say: 'The same evaluator reviews the change, with a pack that caught something.',
+      realCmd: EVALUATE('right'),
+    },
+    {
+      lane: 'right',
       frame: 'VERDICT',
-      say: 'Room decision: {{answer}}. The retained case caught the false history.',
+      extract: 'decision: (promote|reject|revise)|pack: \\d+ case',
+      say: 'The retained case caught the false history.',
+      mockCmd: 'echo "room decision: {{answer}} — the retained case caught the false history"',
+      realCmd: PACK_SUMMARY,
     },
   ],
 };

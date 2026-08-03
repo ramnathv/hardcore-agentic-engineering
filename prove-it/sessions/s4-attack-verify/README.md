@@ -30,7 +30,7 @@ A passing check proves more after you see it fail on a relevant wrong result.
 2. Find one passing test, fixture, or CI command that you do not fully trust.
 3. Bring that check before 5pm Thursday 13 August.
 
-The session is Thursday 13 August, 5pm to 7pm ET. The live comparison needs no key or network access.
+The session is Thursday 13 August, 5pm to 7pm ET. Your copy of the comparison needs no key or network access.
 
 A **gate** is the course command that runs the checks and creates a signed result. That signed result is a **receipt**.
 
@@ -53,7 +53,7 @@ Both lanes use the same wrong implementation. The weak check passes it, but the 
 
 The stronger check also passes the correct implementation. This second passing result shows that the check does not reject every result.
 
-The runner seeds the same wrong file in both lanes. No agent runs in this comparison.
+The runner seeds the same wrong file in both lanes. In the live run a real agent authors the right lane's stronger check, and the supplied adequacy script judges it; in your `--mock` copy no agent runs.
 
 The left lane uses the real gate. The right lane uses the supplied three-state check script.
 

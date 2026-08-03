@@ -1,5 +1,6 @@
 // Pure presentation helpers for the live compare UI. The runner owns execution
 // and evidence. This module owns only the short text that reaches the screen.
+import type { PresentationEvent } from './runtime/protocol.ts';
 
 const ANSI = /\x1b\[[0-?]*[ -/]*[@-~]/g;
 
@@ -109,6 +110,68 @@ export function summarizeTool(name: string, argument: string): string {
   if (/^(bash|shell|exec|run)$/.test(normalized)) return target ? summarizeCommand(target) : 'Ran a command';
   const action = name.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
   return target ? `${action}: ${target}` : action;
+}
+
+// ---------------------------------------------------------------------------
+// The one renderer
+// ---------------------------------------------------------------------------
+
+// Every surface draws from normalized events and nothing else. No provider
+// shape reaches this function: if it ever needs to know which agent produced
+// something, an adapter has stopped doing its job.
+//
+// Two styles, because two surfaces. 'glyph' is the projected two-pane
+// transcript the battery asserts against. 'block' is the labelled grammar the
+// operator CLI uses, where there is room to breathe.
+export interface RenderOptions {
+  style?: 'glyph' | 'block';
+  details?: boolean;
+  width?: number;
+}
+
+const PROSE_LINES_ON_SCREEN = 3; // the rest is in the artifact
+
+export function renderPresentationEvent(
+  event: PresentationEvent,
+  options: RenderOptions = {},
+): string[] {
+  const width = options.width ?? 96;
+  const details = options.details === true;
+  const block = options.style === 'block';
+  const prose = (text: string) => {
+    const lines = wrapText(text, width - 2).filter(Boolean);
+    // --details changes how much of the record reaches the screen. It never
+    // changes the record.
+    return details ? lines : lines.slice(0, PROSE_LINES_ON_SCREEN);
+  };
+
+  switch (event.kind) {
+    case 'agent': {
+      const lines = prose(event.text);
+      return block ? ['AGENT', ...lines] : lines.map((line) => `● ${line}`);
+    }
+    case 'tool': {
+      const head = summarizeTool(event.tool, event.summary);
+      const extra = details ? wrapText(JSON.stringify(event.args), width - 2) : [];
+      return block ? ['TOOL', head, ...extra] : [`⏺ ${head}`, ...extra.map((l) => `  ${l}`)];
+    }
+    case 'tool.result': {
+      const mark = { ok: '✓', failed: '✗', refused: '⊘', in_doubt: '?', pending: '…' }[event.status];
+      const lines = prose(event.line);
+      const reference = event.artifact && details ? [`  full record: ${event.artifact}`] : [];
+      if (block)
+        return [...lines.map((line, i) => `${i === 0 ? mark : ' '} ${line}`), ...reference];
+      return [`⎿ ${mark} ${lines.join(' ')}`, ...reference];
+    }
+    case 'state': {
+      const lines = event.lines.flatMap((line) => wrapText(line, width - 2));
+      return block ? ['STATE', ...lines] : lines.map((line) => `◆ ${line}`);
+    }
+    case 'error': {
+      const lines = wrapText(`${event.code}: ${event.detail}`, width - 2);
+      return block ? ['ERROR', ...lines] : lines.map((line) => `✖ ${line}`);
+    }
+  }
 }
 
 export function evidenceForScreen(line: string): string {

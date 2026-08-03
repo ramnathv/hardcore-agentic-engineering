@@ -69,7 +69,7 @@ Fill one entry the week you do the session.
 - Observation:
 - Retained change:
 
-### S6 — Compose and defend → `<repo>`
+### S6 — Compose verified runs → `<repo>`
 
 - Task:
 - What transferred cleanly:

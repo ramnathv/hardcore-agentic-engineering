@@ -77,7 +77,7 @@ The left lane reads node summaries. Every summary says complete, so it supports 
 
 The right lane reads receipts and recalculates the shared-budget rule. It refuses and names the broken connection.
 
-Both lanes use deterministic fixtures and the scripted demo agent. The room's connection choice is the only live variable.
+In the live run one real coordinator drives the four nodes once, and both lanes read that same node evidence; the nodes themselves stay deterministic. Your `--mock` copy uses a scripted demo agent in the coordinator's place. The room's connection choice changes the run in both.
 
 ### Decide
 

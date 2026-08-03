@@ -17,17 +17,27 @@ const HASH = 'shasum -a 256 working/src/slugify.mjs';
 
 // tee keeps the three adequacy states on disk inside the staged copy, so
 // CONTROL and VERDICT extract from the one run instead of re-running it.
-const ADEQUACY =
+const ADEQUACY_WITH = (check: string) =>
   'bash sessions/s4-attack-verify/fixtures/check-adequacy.sh ' +
-  'working/src/slugify.mjs sessions/s4-attack-verify/fixtures/slugify.test.v3.mjs ' +
-  '2>&1 | tee s4-adequacy.txt';
+  `working/src/slugify.mjs ${check} 2>&1 | tee s4-adequacy.txt`;
+const ADEQUACY = ADEQUACY_WITH('sessions/s4-attack-verify/fixtures/slugify.test.v3.mjs');
 
-// No worker runs in this scenario — the room-seeded faulty candidate stands in
-// for one. This is the brief every green receipt in the compare certifies.
+// Real mode: the strengthened check is written by an agent, not shipped with
+// the session. The agent works in its own stage, so its check is copied back
+// into the lane before the adequacy harness judges it.
+const CLI = 'node live/runtime/cli.ts';
+const AGENT_CHECK = 'working/test/agent-strengthened.test.mjs';
+const AUTHOR =
+  `${CLI} claude --task check-author --run-id {{runid}} ` +
+  `--seed-product working/src/slugify.mjs --artifact {{artifact}}/right --timeout 300; ` +
+  `cp "$TMPDIR/prove-it-live/{{runid}}/working/test/strengthened.test.mjs" ${AGENT_CHECK}`;
+
+// The room-seeded faulty candidate is the product both lanes certify. In mock
+// no worker runs at all; in real, an agent authors the right lane's check.
 const BRIEF_INPUT =
   'outcome: working/src/slugify.mjs turns arbitrary titles into url-safe slugs\n' +
   'check: node --test working/test/slugify.test.mjs\n' +
-  'worker: No worker runs. The room-seeded faulty candidate stands in for one.';
+  'product: the room-seeded faulty candidate — the same bytes in both lanes.';
 
 const scenario: Scenario = {
   id: 's4',
@@ -35,7 +45,7 @@ const scenario: Scenario = {
   sharedFixture:
     'Both lanes use the same room-selected faulty candidate. Check v1 cannot see the selected fault.',
   mechanism:
-    'Both lanes use seeded fixtures, the real gate, and the shipped adequacy script. The result is deterministic.',
+    'Mock: seeded fixtures, the real gate, and the shipped strong check — deterministic. Real: the same seeded fault and gate, with the right lane\'s check written by an agent and judged by the same adequacy script.',
   allowedCausalDifference:
     'The left check omits the selected property. The right check includes it.',
   pause: {
@@ -110,14 +120,20 @@ const scenario: Scenario = {
     },
     {
       lane: 'right',
-      say: 'The supplied fault and stronger check contain the selected property: {{answer}}.',
+      promptDisplay:
+        'Find what the existing check misses about this product, write a stronger check, ' +
+        'and use run_adequacy until all three states hold.',
+      inputLabel: 'REVIEW',
+      say: 'An agent attacks the check. Prose explains the work but never proves adequacy.',
+      realCmd: AUTHOR,
     },
     {
       lane: 'right',
       frame: 'SURPRISE',
       extract: 'state 1: current check stays GREEN',
       say: 'The current check runs against the selected fault.',
-      cmd: ADEQUACY,
+      mockCmd: ADEQUACY,
+      realCmd: ADEQUACY_WITH(AGENT_CHECK),
     },
     {
       lane: 'right',
@@ -129,8 +145,11 @@ const scenario: Scenario = {
     {
       lane: 'right',
       frame: 'VERDICT',
-      extract: 'state 3: strengthened check stays GREEN',
-      say: 'The stronger check also passes the correct solution.',
+      // Either outcome is a real result. A check that catches the fault and
+      // also fails correct code has not earned anything, and the room should
+      // see that when it happens.
+      extract: 'state 3: strengthened check (stays GREEN|fails)',
+      say: 'The stronger check is judged against the correct solution too.',
       cmd: "grep 'state 3' s4-adequacy.txt",
     },
   ],

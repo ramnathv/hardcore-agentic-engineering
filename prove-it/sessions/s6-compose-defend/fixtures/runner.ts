@@ -220,7 +220,17 @@ function cmdRun(): void {
     saveLedger(led);
     console.log(`workflow ${wfId} (${wf.name}): shared budget ${wf.attempts} attempts, retry owner '${wf.retry_owner}'`);
   }
-  for (const node of wf.nodes) runNode(led, wf, node, attack);
+  // --node runs one declared node instead of the whole route. The workflow was
+  // already resumable — a node with a receipt is skipped, not rerun — so this
+  // only narrows what a single call attempts. Without it the behaviour is
+  // exactly what it was: every node, in route order.
+  const only = opt('--node');
+  if (only && !wf.nodes.some((n) => n.id === only))
+    die(`no node '${only}' in ${wfPath} (have: ${wf.nodes.map((n) => n.id).join(', ')})`);
+  for (const node of wf.nodes) {
+    if (only && node.id !== only) continue;
+    runNode(led, wf, node, attack);
+  }
   if (attack === 'overspend') {
     // Attack fixture: the DeadReckon nested-retry bug. A child retry layer
     // grants itself a fresh local budget and re-runs implement, ignoring the

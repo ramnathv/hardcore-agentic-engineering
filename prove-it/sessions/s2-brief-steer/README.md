@@ -53,7 +53,7 @@ After the first run, the operator states a correction but saves it nowhere. No C
 
 The `--mock` command below replays a sanitized capture of the two real-agent runs.
 
-In `DURABLE RUN EVENT`, a scripted demo agent stops and resumes. The real run log records the interrupt position.
+In `DURABLE RUN EVENT`, the live run resumes the same interrupted worker with the correction recorded as a run event; your `--mock` copy uses a scripted demo agent that stops and resumes. The real run log records the interrupt position in both.
 
 A **run log** is the ordered event file at `runs/<run-id>/events.jsonl`. It remains after the command stops.
 

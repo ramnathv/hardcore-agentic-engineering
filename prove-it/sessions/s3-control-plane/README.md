@@ -32,7 +32,7 @@ A crashed run must not repeat an external action until you know what happened.
 
 A **run log** is the saved record of one run.
 
-The session is Tuesday 11 August, 5pm to 7pm ET. The live comparison needs no key or network access.
+The session is Tuesday 11 August, 5pm to 7pm ET. Your copy of the comparison needs no key or network access.
 
 ## During the live session
 
@@ -44,7 +44,7 @@ Both lanes start after the same simulated crash. The crash occurs after a paymen
 
 The **blind retry** sends the payment again. The **evidence-first recovery** reads the ledger before it acts.
 
-The lanes use a scripted demo agent so that the crash occurs at the same point. The ledger and the harness checks are real local programs.
+In the live run one real agent makes the payment, and the crash is pinned to the `send_payment` tool — it lands at the same point however the agent gets there. Your `--mock` copy uses a scripted demo agent. The ledger and the harness checks are real local programs in both.
 
 `needs_reconcile` means that the harness does not know whether the action happened. It does not mean that the action failed.
 

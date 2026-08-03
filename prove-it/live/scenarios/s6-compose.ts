@@ -9,6 +9,29 @@ import type { Scenario } from '../scenario.ts';
 
 const FIX = 'sessions/s6-compose-defend/fixtures';
 const RUNNER = `node ${FIX}/runner.ts`;
+const CLI = 'node live/runtime/cli.ts';
+
+// Real mode: one coordinator drives the four nodes, once. Both lanes then take
+// the same node evidence — the brief is explicit that the node work happens a
+// single time and is shared, so the lanes differ only in what their fan-in is
+// permitted to trust.
+const COORD_STAGE = '$TMPDIR/prove-it-live/{{shared}}';
+// The workflow id is the scenario's, not the brief's — the lanes read the
+// evidence back by that name, so the coordinator has to be told it.
+const COORDINATE =
+  `${CLI} claude --task coordinate --run-id {{shared}} ` +
+  `--artifact {{artifact}}/coord --timeout 280 --brief ` +
+  `"You are coordinating the workflow slug-kit-verified. Its declared route is inspect, ` +
+  `then implement, then verify and review. Run each node in that order with ` +
+  `run_workflow_node, using workflow_id '{{shared}}'. Every node shares one attempt budget. ` +
+  `Stop as soon as a node fails and say which one and why. When all four have run, state ` +
+  `how many attempts were spent. Do not judge whether the workflow should be released — a ` +
+  `separate fan-in step decides that."`;
+const TAKE_NODE_EVIDENCE =
+  `cp -R ${COORD_STAGE}/runs/. runs/ 2>/dev/null; ` +
+  `cp -R ${COORD_STAGE}/control/receipts/. control/receipts/ 2>/dev/null; ` +
+  `cp -R ${COORD_STAGE}/working/. working/ 2>/dev/null; ` +
+  `echo "took the node evidence: $(ls control/receipts | grep -c '\\.json$') receipts"`;
 
 // wf-demo.sh's promotion defaults, verbatim — declared before the night;
 // every run, live included, ships these, and the sheet narrates the record.
@@ -29,7 +52,7 @@ const scenario: Scenario = {
   sharedFixture:
     'Both lanes use the same four-node workflow and four accepted receipts. The room breaks the same seam in each copy.',
   mechanism:
-    'Both lanes use deterministic fixtures and the harness smoke worker. The room seam is the only live variable.',
+    'Mock: deterministic fixtures and the harness smoke worker in each lane. Real: one Claude coordinator drives the four nodes once, and both lanes take that same node evidence. The nodes stay deterministic and harness-owned in both.',
   allowedCausalDifference:
     'The left completion rule reads summaries. The right completion rule reads receipts and recomputes the invariant.',
   // The pause is lane 'both': the seam decision must reach BOTH staged copies
@@ -62,10 +85,22 @@ const scenario: Scenario = {
   },
   steps: [
     // SHARED — the same starting state in both lanes, then the room's seam.
+    // Mock runs the workflow in each lane's own copy. Real runs one
+    // coordinator here, and the other lane waits for it rather than starting a
+    // second one.
     {
-      lane: 'both',
+      lane: 'left',
       say: 'The staged workflow produces four gate-accepted receipts.',
-      cmd: `${RUNNER} run --wf-id {{runid}}`,
+      mockCmd: `${RUNNER} run --wf-id {{shared}}`,
+      realCmd: `${COORDINATE}; ${TAKE_NODE_EVIDENCE}`,
+      signals: 'nodes',
+    },
+    {
+      lane: 'right',
+      awaits: 'nodes',
+      say: 'The same four node outcomes, from the same coordinator run.',
+      mockCmd: `${RUNNER} run --wf-id {{shared}}`,
+      realCmd: TAKE_NODE_EVIDENCE,
     },
     {
       lane: 'left',
@@ -83,7 +118,7 @@ const scenario: Scenario = {
     {
       lane: 'both',
       say: 'The room breaks the same seam in both copies: {{answer}}.',
-      cmd: `bash ${FIX}/break-seam.sh {{runid}} '{{answer}}'`,
+      cmd: `bash ${FIX}/break-seam.sh {{shared}} '{{answer}}'`,
     },
 
     // LEFT — a labeled decision frame derived from the summaries; no join runs.
@@ -92,7 +127,7 @@ const scenario: Scenario = {
       frame: 'SURPRISE',
       extract: '\\d+/4 summaries read complete',
       say: 'The room broke {{answer}}. Count the summaries that noticed.',
-      cmd: `bash ${FIX}/node-summaries.sh {{runid}}`,
+      cmd: `bash ${FIX}/node-summaries.sh {{shared}}`,
     },
     {
       lane: 'left',
@@ -115,7 +150,7 @@ const scenario: Scenario = {
       frame: 'SURPRISE',
       extract: 'join: REFUSED',
       say: 'The evidence-bound join asks five questions about the same runs.',
-      cmd: `${RUNNER} join --wf-id {{runid}} || true`,
+      cmd: `${RUNNER} join --wf-id {{shared}} || true`,
     },
     {
       lane: 'right',
@@ -127,12 +162,12 @@ const scenario: Scenario = {
       frame: 'VERDICT',
       extract: '"reason"',
       say: 'The join writes its refusal to disk.',
-      cmd: 'cat runs/{{runid}}/join-result.json',
+      cmd: 'cat runs/{{shared}}/join-result.json',
     },
     {
       lane: 'right',
       say: 'The runner restores the seam before promotion.',
-      cmd: `bash ${FIX}/break-seam.sh {{runid}} restore`,
+      cmd: `bash ${FIX}/break-seam.sh {{shared}} restore`,
     },
     {
       lane: 'right',
@@ -144,7 +179,7 @@ const scenario: Scenario = {
       lane: 'right',
       showOutput: true,
       say: 'A human promotes with a named owner and rollback path.',
-      cmd: `bash ${FIX}/promote.sh {{runid}} --owner "${OWNER}" --rollback "${ROLLBACK}"`,
+      cmd: `bash ${FIX}/promote.sh {{shared}} --owner "${OWNER}" --rollback "${ROLLBACK}"`,
     },
     {
       lane: 'right',

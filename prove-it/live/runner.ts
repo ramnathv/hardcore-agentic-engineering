@@ -37,11 +37,20 @@ import {
   cleanInlineMarkdown,
   evidenceForScreen,
   inputBlocks,
+  renderPresentationEvent,
   stripAnsi,
   summarizeCommand,
   summarizeTool,
   wrapText,
 } from './presentation.ts';
+import { presentClaudeLine } from './providers/claude-cli.ts';
+import {
+  armBarriers,
+  awaitCheckpoint,
+  releasePeer,
+  signalCheckpoint,
+  waitAtFrame,
+} from './runtime/barriers.ts';
 import type { FrameName, LaneSide, PauseSpec, Scenario, Step } from './scenario.ts';
 
 const LIVE = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +77,10 @@ const FRAME_COLOR: Record<FrameName, string> = {
   VERDICT: C.green,
 };
 const FRAME_INDEX: Record<FrameName, number> = { START: 1, SURPRISE: 2, CONTROL: 3, VERDICT: 4 };
+// How long a pane will hold at a frame for its peer. Generous, because a real
+// worker runs for minutes — but finite, because a pane that waits forever in
+// front of a room is worse than one that says what went wrong.
+const FRAME_WAIT_MS = Number(process.env.PROVE_IT_FRAME_WAIT_MS ?? 600_000);
 const BAD = /fail(?!\s*0\b)|refus|✖|error|unexpected/i; // VERDICT (and summary) go red by content
 
 const argv = process.argv.slice(2);
@@ -79,6 +92,14 @@ const opt = (name: string): string | undefined => {
 };
 const MOCK = has('--mock');
 const CI = has('--ci');
+// Display depth only. It changes how much of the record reaches the screen and
+// never what the record contains — the artifact is identical either way.
+const DETAILS = has('--details');
+// Explicit replay. It never starts a provider: a capture-backed lane plays its
+// recording instead. There is deliberately no automatic path into this mode —
+// a run that falls back to a recording on its own is a run whose evidence
+// nobody can trust.
+const CAPTURE = has('--capture');
 const LANE = opt('--lane') as LaneSide | undefined;
 const ARTIFACT_OPT = opt('--artifact');
 const MODE = MOCK ? 'mock' : 'real';
@@ -104,7 +125,11 @@ function cleanup() {
     }
   }
 }
-process.on('exit', cleanup);
+process.on('exit', () => {
+  // Whatever happens to this lane, its peer must not be left at a barrier.
+  if (LANE && artDir) releasePeer(artDir, LANE, process.exitCode ? `exit ${process.exitCode}` : 'lane finished');
+  cleanup();
+});
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const)
   process.on(sig, () => {
     console.error(`\nrunner: interrupted — artifact preserved, temp copies removed.`);
@@ -160,10 +185,16 @@ function stageLane(sc: Scenario, side: LaneSide): string {
     filter: (src) => {
       const rel = relative(ROOT, src);
       if (rel === '') return true;
-      const top = rel.split(sep)[0];
-      // live/ stays out of the stage: nothing in a lane needs the runner, and a
-      // real worker must not find captures of the demo it is starring in.
-      return top !== '.git' && top !== 'node_modules' && top !== 'live';
+      const parts = rel.split(sep);
+      const top = parts[0];
+      if (top === '.git' || top === 'node_modules') return false;
+      if (top !== 'live') return true;
+      if (parts.length === 1) return true; // the live/ directory itself
+      // A lane needs the live runtime — S3 drives it directly. It must never
+      // get the script of the demo it is starring in: no scenarios, no
+      // captures, no runner, no artifacts from earlier runs.
+      const second = parts[1];
+      return second === 'runtime' || second === 'providers' || second === 'presentation.ts';
     },
   });
   for (const runState of [join(tmp, 'runs'), join(tmp, 'control', 'receipts')]) {
@@ -230,8 +261,18 @@ const blank = () => put('');
 const show = (s: string) => put('  ' + s);
 const logLane = (side: LaneSide, text: string) =>
   appendFileSync(join(artDir, `${side}.log`), text + '\n');
+// {{artifact}} and {{shared}} are the same in both panes: the artifact
+// directory is what the lanes have in common, so a shared prefix can be named
+// without either lane having to know about the other.
 const interp = (s: string, lane: LaneState) =>
-  s.replaceAll('{{runid}}', lane.runid).replaceAll('{{answer}}', lane.answer ?? '{{answer}}');
+  s
+    .replaceAll('{{runid}}', lane.runid)
+    .replaceAll('{{artifact}}', artDir)
+    .replaceAll('{{shared}}', sharedId())
+    .replaceAll('{{answer}}', lane.answer ?? '{{answer}}');
+
+// A run id both panes derive identically, from the one thing they share.
+const sharedId = () => `sh-${artDir.split(sep).pop()}`;
 const firstLine = (s: string) => s.split('\n').find((l) => l.trim())?.trim() ?? '';
 const paneColumns = () => process.stdout.columns ?? 118;
 const bodyWidth = (prefixWidth = 0) => Math.max(34, Math.min(92, paneColumns() - 6) - prefixWidth);
@@ -378,59 +419,20 @@ function makeStream(mode: 'worker' | 'exhibit') {
   };
 }
 
-// ── live `claude -p --output-format stream-json` rendering (lib.mjs shape) ──
-function summarizeInput(input: unknown): string {
-  if (!input || typeof input !== 'object') return '';
-  const o = input as Record<string, unknown>;
-  if (o.file_path) return String(o.file_path).split('/').pop() ?? '';
-  if (o.path) return String(o.path);
-  if (o.command) return String(o.command).split('\n')[0].slice(0, 60);
-  if (o.pattern) return String(o.pattern);
-  const s = JSON.stringify(o);
-  return s.length > 60 ? s.slice(0, 60) + '…' : s;
-}
-// Returns rendered lines for a stream-json event, [] for a consumed event with
-// nothing to show, or null when the line is not an event (plain worker output).
-function claudeEventLines(raw: string, side: LaneSide): string[] | null {
-  if (!raw.startsWith('{')) return null;
-  let ev: any;
-  try {
-    ev = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof ev?.type !== 'string') return null;
-  const rendered: string[] = [];
-  if (ev.type === 'system' && ev.subtype === 'init') rendered.push('⏺ Started the worker session');
-  else if (ev.type === 'assistant' && ev.message?.content) {
-    for (const c of ev.message.content) {
-      if (c.type === 'text' && c.text?.trim()) {
-        const lines = String(c.text)
-          .split('\n')
-          .map((line) => cleanInlineMarkdown(line))
-          .filter(Boolean)
-          .slice(0, 3);
-        rendered.push(...lines.map((line) => `● ${line}`));
-      }
-      else if (c.type === 'tool_use') {
-        const arg = summarizeInput(c.input);
-        rendered.push(`⏺ ${summarizeTool(c.name, arg)}`);
-      }
-    }
-  } else if (ev.type === 'user' && ev.message?.content) {
-    for (const c of ev.message.content) {
-      if (c.type === 'tool_result') {
-        const body = Array.isArray(c.content) ? c.content.map((x: any) => x.text || '').join(' ') : c.content || '';
-        const first = String(body).trim().split('\n')[0];
-        if (first) rendered.push('⎿ ' + first);
-      }
-    }
-  } else if (ev.type === 'result') {
-    // the complete final answer goes to the artifact; the stream showed its head
-    if (typeof ev.result === 'string' && ev.result.trim())
-      logLane(side, '--- final answer (full text) ---\n' + ev.result.trim());
-  }
-  return rendered;
+// ── worker stream rendering ────────────────────────────────────────────────
+// The runner does not parse provider output. The adapter turns a stream line
+// into normalized events; the renderer turns those into screen lines. Adding a
+// second provider adds an adapter here, and nothing else.
+//
+// Returns rendered lines, or null when the line is not a provider event at all
+// and should be printed as it stands.
+function workerStreamLines(raw: string, side: LaneSide): string[] | null {
+  const parsed = presentClaudeLine(raw);
+  if (!parsed) return null;
+  if (parsed.artifact) logLane(side, parsed.artifact);
+  return parsed.events.flatMap((event) =>
+    renderPresentationEvent(event, { style: 'glyph', details: DETAILS, width: 96 }),
+  );
 }
 
 function execStep(
@@ -438,9 +440,9 @@ function execStep(
   cwd: string,
   timeoutMs: number,
   side: LaneSide,
-  options: { render: 'worker' | 'exhibit' | 'none'; allowFallback: boolean },
+  options: { render: 'worker' | 'exhibit' | 'none' },
 ) {
-  return new Promise<{ code: number; out: string; timedOut: boolean; fallbackRequested: boolean }>((done) => {
+  return new Promise<{ code: number; out: string; timedOut: boolean }>((done) => {
     const child = spawn('bash', ['-c', cmdText], {
       cwd,
       env: childEnv(),
@@ -452,7 +454,7 @@ function execStep(
     const onLine = (line: string) => {
       lines.push(line);
       if (options.render === 'worker') {
-        const rendered = claudeEventLines(line, side);
+        const rendered = workerStreamLines(line, side);
         if (rendered) {
           for (const r of rendered) {
             logLane(side, r);
@@ -467,7 +469,6 @@ function execStep(
     readline.createInterface({ input: child.stdout! }).on('line', onLine);
     readline.createInterface({ input: child.stderr! }).on('line', onLine);
     let timedOut = false;
-    let fallbackRequested = false;
     const input = process.stdin as NodeJS.ReadStream;
     const wasPaused = input.isPaused();
     const wasRaw = input.isRaw ?? false;
@@ -491,14 +492,9 @@ function execStep(
         process.kill(process.pid, 'SIGINT');
         return;
       }
-      if (key.toLowerCase().includes('f')) {
-        fallbackRequested = true;
-        uiActivity('Replay requested. Stopping the live worker.', { color: C.yellow, symbol: '■' });
-        stopChild();
-      }
     };
-    if (options.allowFallback && input.isTTY && input.setRawMode) {
-      uiMeta('Press f to use the recorded worker instead.');
+    if (input.isTTY && input.setRawMode) {
+      // Ctrl-C only. There is no key that swaps a live worker for a recording.
       input.setRawMode(true);
       input.resume();
       input.on('data', onInput);
@@ -510,13 +506,13 @@ function execStep(
     child.on('error', () => {
       clearTimeout(timer);
       stopInput();
-      done({ code: 127, out: lines.join('\n'), timedOut, fallbackRequested });
+      done({ code: 127, out: lines.join('\n'), timedOut });
     });
     child.on('close', (code) => {
       clearTimeout(timer);
       stopInput();
       stream?.flush();
-      done({ code: code ?? 1, out: lines.join('\n'), timedOut, fallbackRequested });
+      done({ code: code ?? 1, out: lines.join('\n'), timedOut });
     });
   });
 }
@@ -610,6 +606,21 @@ function matchExtract(pattern: string, out: string): string | null {
 
 // Frames replayed from a capture are matched in order: the cursor only moves
 // forward, so START/SURPRISE/CONTROL/VERDICT land in sequence.
+// Hold this pane at the frame until the other one is showing the same thing.
+// A lane that is alone never waits; a lane whose peer died is released and told
+// so on screen, rather than standing at a barrier in front of a room.
+async function syncAtFrame(lane: LaneState, frame: FrameName): Promise<void> {
+  const result = await waitAtFrame(artDir, lane.side, frame, FRAME_WAIT_MS);
+  if (result.outcome === 'synced' && result.waitedMs > 400)
+    uiMeta(`… waited ${(result.waitedMs / 1000).toFixed(1)}s for the other lane at ${frame}`);
+  if (result.outcome === 'peer_failed' || result.outcome === 'timeout') {
+    uiSection('LANE ERROR', C.red);
+    uiParagraph(result.detail, { color: C.red, bold: true });
+    lane.unexpected = true;
+    process.exitCode = 1;
+  }
+}
+
 function frameFromCapture(lane: LaneState, step: Step): string | null {
   const re = new RegExp(step.extract!);
   for (let i = lane.capCursor; i < lane.capLines.length; i++) {
@@ -644,7 +655,9 @@ function emitFrame(
   }
   lane.activityOpen = false;
   setPaneTitle(sc, lane, name);
-  appendFileSync(join(artDir, 'frames.txt'), `${lane.side} ${name} │ ${line}\n`);
+  // The evidence file is read by the battery and by people. Colour codes from
+  // a lane's own output are screen decoration, not evidence.
+  appendFileSync(join(artDir, 'frames.txt'), `${lane.side} ${name} │ ${stripAnsi(line)}\n`);
 }
 
 async function runPause(sc: Scenario, lane: LaneState) {
@@ -760,6 +773,18 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
 
   for (const step of sc.steps) {
     if (step.lane !== 'both' && step.lane !== side) continue;
+    if (step.awaits) {
+      const ready = await awaitCheckpoint(artDir, side, step.awaits, FRAME_WAIT_MS);
+      if (ready.outcome === 'synced')
+        uiMeta(`… the other lane finished ${step.awaits}; continuing from it`);
+      if (ready.outcome === 'peer_failed' || ready.outcome === 'timeout') {
+        uiSection('LANE ERROR', C.red);
+        uiParagraph(ready.detail, { color: C.red, bold: true });
+        lane.unexpected = true;
+        process.exitCode = 1;
+        return;
+      }
+    }
     const context = step.say ? interp(step.say, lane) : undefined;
     if (context) {
       if (step.frame) logLane(side, `· ${context}`);
@@ -772,7 +797,17 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
       else await runPause(sc, lane);
     }
 
-    const cmdText = MOCK ? (step.mockCmd ?? step.cmd) : (step.realCmd ?? step.cmd);
+    // --capture replays a recorded worker where a lane has one. A lane with no
+    // recording has nothing to replay, so it runs its keyless mock path — the
+    // alternative would be executing real-mode commands against a shared
+    // prefix no worker ever produced.
+    const declared =
+      MOCK || (CAPTURE && !spec.capture)
+        ? (step.mockCmd ?? step.cmd)
+        : (step.realCmd ?? step.cmd);
+    // In --capture the worker step is not executed at all; the replay below
+    // takes it, exactly as the mock path does for a real-only lane.
+    const cmdText = CAPTURE && step.captureRef === true ? undefined : declared;
     const isWorker = step.captureRef === true || Boolean(step.promptDisplay);
     let out: string | null = null;
     if (!lane.onCapture && cmdText) {
@@ -787,30 +822,36 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
       }
       const res = await execStep(cmd, cwd, timeoutMs, side, {
         render,
-        allowFallback: !MOCK && Boolean(spec.capture) && step.captureRef === true,
       });
       out = res.out;
-      if (res.fallbackRequested || res.timedOut || res.code !== 0) {
-        const why = res.fallbackRequested
-          ? 'operator pressed f'
-          : res.timedOut
+      if (res.timedOut || res.code !== 0) {
+        const why = res.timedOut
           ? `timed out after ${timeoutMs / 1000}s`
           : `failed (exit ${res.code})`;
-        if (!MOCK && spec.capture) {
-          replayCapture(sc, lane, `the live step ${why}`);
-          lane.capChunked = true;
-          openActivity(lane);
-          playCaptureChunk(lane, { body: true, cmds: true });
-          out = null;
-        } else {
-          uiSection('UNEXPECTED', C.red);
-          uiParagraph(`The step ${why}. This lane has no replay capture.`, { color: C.red, bold: true });
-          lane.unexpected = true;
-          process.exitCode = 1;
-        }
+        // A live step that fails is a live step that failed. Sliding into a
+        // recording here would put a rehearsal on screen under the same
+        // labels as a real run, which is the one thing the artifact could
+        // never tell the room afterwards.
+        uiSection('UNEXPECTED', C.red);
+        uiParagraph(`The step ${why}.`, { color: C.red, bold: true });
+        if (spec.capture)
+          uiParagraph(
+            `To show the recorded worker instead, start again with: ${replayCommand(sc)} --capture`,
+            { color: C.white },
+          );
+        lane.unexpected = true;
+        process.exitCode = 1;
       }
     } else if (!lane.onCapture && !cmdText && step.captureRef) {
-      replayCapture(sc, lane, MOCK ? `real-only step in --mock mode` : `real-only step, real mode off`);
+      replayCapture(
+        sc,
+        lane,
+        CAPTURE
+          ? `--capture was given on the command line`
+          : MOCK
+          ? `real-only step in --mock mode`
+          : `real-only step, real mode off`,
+      );
       if (lane.onCapture) {
         lane.capChunked = true;
         openActivity(lane);
@@ -821,6 +862,13 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
       playCaptureChunk(lane, { body: isWorker, cmds: isWorker });
     }
 
+    // Signalled before the frame barrier, never after. The checkpoint says
+    // "the work your lane needs is on disk"; the barrier says "wait for me on
+    // screen". Doing them the other way round deadlocks a two-pane run: this
+    // lane blocks at the barrier while its peer waits for the checkpoint this
+    // step just finished producing.
+    if (step.signals) signalCheckpoint(artDir, step.signals);
+
     if (step.frame) {
       let line: string | null = null;
       if (step.extract) {
@@ -830,8 +878,10 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
       } else if (out) {
         line = firstLine(out);
       }
-      if (line) emitFrame(sc, lane, step.frame, line, context, Boolean(step.extract));
-      else {
+      if (line) {
+        emitFrame(sc, lane, step.frame, line, context, Boolean(step.extract));
+        await syncAtFrame(lane, step.frame);
+      } else {
         emitFrame(
           sc,
           lane,
@@ -841,6 +891,7 @@ async function runLane(sc: Scenario, side: LaneSide): Promise<LaneState> {
         );
         lane.unexpected = true;
         process.exitCode = 1;
+        await syncAtFrame(lane, step.frame);
       }
     }
   }
@@ -950,9 +1001,12 @@ function orchestrate(sc: Scenario) {
   const ses = `prove-it-live-${sc.id}`;
   const tmux = (...args: string[]) => spawnSync('tmux', args, { encoding: 'utf8' });
   tmux('kill-session', '-t', ses);
-  const flags = `${MOCK ? ' --mock' : ''}${CI ? ' --ci' : ''}`;
+  const flags = `${MOCK ? ' --mock' : ''}${CI ? ' --ci' : ''}${DETAILS ? ' --details' : ''}`;
   const paneCmd = (side: LaneSide) =>
     `cd '${ROOT}' && env NODE_NO_WARNINGS=1 node live/runner.ts ${sc.id} --lane ${side}${flags} --artifact '${artDir}'; exec sh -c 'read -r _'`;
+  // Both panes are about to exist, so each may wait for the other. Without
+  // this the lanes run alone and never synchronize.
+  armBarriers(artDir, ['left', 'right']);
   tmux('new-session', '-d', '-s', ses, '-x', '240', '-y', '56', '-n', 'compare', paneCmd('left'));
   tmux('split-window', '-d', '-h', '-l', '50%', '-t', `${ses}:0`, paneCmd('right'));
   tmux('set-window-option', '-t', `${ses}:0`, 'remain-on-exit', 'off');

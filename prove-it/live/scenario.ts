@@ -32,6 +32,13 @@ export interface Step {
   // LaneSpec.promptDisplay instead.
   promptDisplay?: string;
   inputLabel?: string; // short screen label such as INPUT, CONTRACT, or CHANGE
+  // The shared-prefix pair. One lane does a piece of work both lanes need —
+  // typically the real agent history before the lesson control changes — and
+  // signals when it is done. The other awaits that name before it continues,
+  // instead of running the same work again. Two lanes each starting their own
+  // agent would be comparing two agents, not two controls.
+  signals?: string; // this lane owns the checkpoint and reaches it here
+  awaits?: string; // this lane waits for the checkpoint before this step
   // Replay the lane's capture file (with a labeled provenance banner) instead
   // of executing, when the current mode cannot run this step — the mock path
   // for a real-only lane, and the anchor real-mode fallback jumps to.
