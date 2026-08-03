@@ -99,7 +99,7 @@ This reflection is useful preparation for later sessions. It is not a Project 2 
 
 ### Save and submit
 
-- **Save:** Add this work to `projects/project-2.md` on your `project-2` branch.
+- **Save:** Add this work to `projects/project-2.md` on your `project-2` branch. Branch from last week's branch, not `main`: `git checkout project-1 && git checkout -b project-2` — [projects/README.md](../../projects/README.md) shows the chain.
 - **Link from:** After submission, add the final control-evidence link to the Operate row of [`PROOF.md`](../../PROOF.md).
 - **Submit:** Use the Maven Project 2 item.
 - **Due:** Friday 14 August.
@@ -577,7 +577,7 @@ Two readers load the log, so the warning prints twice. The harness drops the inc
 
 ### Classify probe results
 
-Use the probe output for four attempts. Record each attempt with this format:
+Pick four of the six probe attempts. Record each one with this format:
 
 ```text
 attempt → label (refused|contained|allowed|unsupported) — evidence: <the printed line>
@@ -677,6 +677,13 @@ run=m5m6-close status=completed (receipt verified by dr-gate)
 
 This receipt shows that the original gate path still works after your changes. It does not complete M5 or M6 by itself.
 
+Leave the checkout clean before the next session. The final copy above touched a tracked file:
+
+```sh
+git checkout -- working/src/slugify.mjs
+rm -rf runs/burn runs/s3-demo runs/m5m6-close control/receipts/m5m6-close.json
+```
+
 ### Classify six situations
 
 Classify each result as `ok`, `failed`, `in_doubt`, `refused`, or `pending`. Write the evidence query for each `in_doubt` result.
@@ -688,10 +695,12 @@ Classify each result as `ok`, `failed`, `in_doubt`, `refused`, or `pending`. Wri
 5. A deploy needs the release owner, who has not answered.
 6. A file read reports that the file does not exist.
 
+Write your answers in `FIELD-NOTES.md` before you open [homework-solutions.md](homework-solutions.md).
+
 ### Optional depth is complete when
 
 - [ ] Each extension that you built prints its stated OK line.
 - [ ] `npm test` and `bash scripts/green-check.sh` pass on your extended fork.
 - [ ] The reducer command prints `REDUCER-OK`.
-- [ ] Your policy matrix covers all seven action classes.
+- [ ] If you built Prompt 3, your policy table in `src/tools.ts` covers all seven action classes from [prompts/manufacture.md](prompts/manufacture.md).
 - [ ] You compared your evidence with the full M5 or M6 row in [`MILESTONES.md`](../../MILESTONES.md).

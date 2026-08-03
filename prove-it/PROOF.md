@@ -19,7 +19,7 @@ Write each row the week you earn it:
 
 - **Week 1** fills Define and Brief.
 - **Week 2** fills Operate and Verify.
-- **Week 3** fills Compound, then the three fields under the table.
+- **Week 3** fills the three fields above the table, then Compound, then the three fields under the table.
 
 Say the row. Then link the artifact that proves it. Do not paste console output
 into this card. Raw receipts, traces and check outputs stay behind the links,

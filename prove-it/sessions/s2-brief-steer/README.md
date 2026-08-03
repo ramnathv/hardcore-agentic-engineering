@@ -154,7 +154,7 @@ Maven does not grade a fixed rider template or character limit. The optional eng
 1. Start a fresh agent with no previous chat.
 2. Give it only your goal and rider.
 3. Read its first tool action.
-4. Save that action in `projects/project-1-evidence/first-run.md`.
+4. Create `projects/project-1-evidence/` if it does not exist. Save that action in `projects/project-1-evidence/first-run.md`.
 5. If the agent uses a wrong premise, stop it.
 6. Add the corrective fact to the rider.
 7. If you revise the brief, run the task again from it.
@@ -166,24 +166,24 @@ A **fresh agent** starts without earlier conversation context. This makes the wr
 > [!NOTE]
 > **Optional evidence upgrade:** If you want the gate to judge your repository, use [PORT.md](../../PORT.md). Project 1 does not require this receipt.
 
-If you already opened a PORT run, use the same run ID. Do not open a duplicate run.
+If you already opened a PORT run in Session 1, use the same run ID. Do not open a duplicate run. If you revised the contract after open, open a new run with a new run ID — the old run stays as evidence.
 
-If you choose PORT, open the run before your agent starts:
+If you choose PORT, first read [PORT.md](../../PORT.md) and add `candidate_dir` and `protect` to your contract. Then open the run before your agent starts:
 
 ```sh
-node src/loop.ts open --run-id p1 --contract projects/project-1-contract.yaml
+node src/loop.ts open --run-id port-1 --contract projects/project-1-contract.yaml
 ```
 
 After the agent finishes, ask the gate to check the run:
 
 ```sh
-node control/dr-gate.ts check p1
+node control/dr-gate.ts check port-1
 ```
 
 Complete the run:
 
 ```sh
-node src/loop.ts complete p1
+node src/loop.ts complete port-1
 ```
 
 The decisive result is a receipt in `control/receipts/` or an honest refusal. The harness never writes to your repository.
@@ -194,9 +194,9 @@ The decisive result is a receipt in `control/receipts/` or an honest refusal. Th
 - Save the rider as `projects/project-1-rider.md` in the `prove-it` clone.
 - Save the first tool action and first-run result in `projects/project-1-evidence/first-run.md`.
 - Link `projects/project-1-evidence/first-run.md` from `projects/project-1.md`.
-- Link the cold-start brief from the Brief row in [PROOF.md](../../PROOF.md) after submission.
+- Link `projects/project-1-goal.md` and `projects/project-1-rider.md` from the Brief row in [PROOF.md](../../PROOF.md) after submission.
 - Keep private notes in `FIELD-NOTES.md`. Do not submit that file.
-- Submit a link to `projects/project-1.md` in Maven Project 1 by Friday 7 August.
+- Submit a link to `projects/project-1.md` in Maven Project 1 by Friday 7 August. A link needs your fork, the `project-1` branch, and a push — [projects/README.md](../../projects/README.md) shows the mechanics.
 
 Project 1 uses these five headings:
 
@@ -593,7 +593,7 @@ The source is deliberately poor. Preserve it as the input, not as course instruc
 Then complete these two exercises:
 
 1. Adapt `prompts/goal-m03.md` to your task and keep it under 4,000 characters.
-2. Read `fixtures/events/steering.jsonl` and answer these questions:
+2. Read [fixtures/events/steering.jsonl](fixtures/events/steering.jsonl) and answer these questions:
    - Which premise did the operator reject?
    - What is the final `planVersion`?
    - What action is pending at the end?

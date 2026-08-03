@@ -418,6 +418,7 @@ The adapter asks it for one text-only turn.
 Run one of these commands from the `prove-it` root:
 
 ```sh
+mkdir -p s0-evidence
 node src/loop.ts run --provider claude-cli --run-id real-turn 2>&1 | tee s0-evidence/real-turn.txt
 # or: --provider codex-cli
 ```

@@ -69,6 +69,11 @@ const C = {
   gray: '\x1b[90m',
 };
 
+// Same scrub as runner.ts: a NODE_TEST_CONTEXT inherited from a node:test
+// ancestor (usually via a tmux server a test suite started) makes any child
+// `node --test <check>` skip silently. The gate must never inherit that.
+delete process.env.NODE_TEST_CONTEXT;
+
 const argv = process.argv.slice(2);
 const command = argv[0];
 const opt = (name: string): string | undefined => {

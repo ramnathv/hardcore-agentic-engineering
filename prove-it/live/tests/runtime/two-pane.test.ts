@@ -28,8 +28,14 @@ for (const scenario of ['s1', 's2', 's3', 's4', 's5', 's6']) {
     const session = `prove-it-test-${scenario}-${process.pid}`;
     try {
       armBarriers(art, ['left', 'right']);
+      // env -u NODE_TEST_CONTEXT: this test runs under node --test, which sets
+      // that variable for its children — and the tmux server it starts passes
+      // it into every pane. A lane's own `node --test <check>` then thinks it
+      // is a test-runner child and SKIPS the check silently (exit 0, no TAP),
+      // so the s4 frames find no decisive line. It hid for a day because a
+      // tmux server started from a clean shell was already running.
       const pane = (side: string) =>
-        `cd '${REPO}' && NODE_NO_WARNINGS=1 node live/runner.ts ${scenario} --mock --ci ` +
+        `cd '${REPO}' && env -u NODE_TEST_CONTEXT NODE_NO_WARNINGS=1 node live/runner.ts ${scenario} --mock --ci ` +
         `--lane ${side} --artifact '${art}'; sleep 120`;
       tmux('new-session', '-d', '-s', session, '-x', '240', '-y', '56', pane('left'));
       tmux('split-window', '-d', '-h', '-t', `${session}:0`, pane('right'));

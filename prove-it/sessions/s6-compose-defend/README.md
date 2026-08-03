@@ -7,7 +7,7 @@ A workflow can release after its receipts agree and a person approves it.
 **Course outcomes:** Define, Brief, Operate, Verify, and Compound
 
 > [!IMPORTANT]
-> Project 3 needs your run shape, receipt or truthful refusal, release owner, remaining blind spot, and completed run card. The fixture workflow is practice.
+> Project 3 needs your run shape, receipt or truthful refusal, release owner, remaining risk, and completed run card. The fixture workflow is practice.
 
 **Do before class:** Read Chapter 6 and bring `PROOF.md`.
 
@@ -71,17 +71,17 @@ During the instructor demo, watch and predict. There is nothing to type. Run the
 
 ### Watch
 
-Both lanes use the same four node results and the same broken connection.
+Both lanes use the same four node results and the same broken seam.
 
 The left lane reads node summaries. Every summary says complete, so it supports release.
 
-The right lane reads receipts and recalculates the shared-budget rule. It refuses and names the broken connection.
+The right lane reads receipts and recalculates the shared-budget rule. It refuses and names the broken seam.
 
-In the live run one real coordinator drives the four nodes once, and both lanes read that same node evidence; the nodes themselves stay deterministic. Your `--mock` copy uses a scripted demo agent in the coordinator's place. The room's connection choice changes the run in both.
+In the live run one real coordinator drives the four nodes once, and both lanes read that same node evidence; the nodes themselves stay deterministic. Your `--mock` copy uses a scripted demo agent in the coordinator's place. The room's seam choice changes the run in both.
 
 ### Decide
 
-Choose one connection to break:
+Choose one seam to break:
 
 - `write-set-overlap`
 - `swapped-receipt-identity`
@@ -133,7 +133,7 @@ Project 3 uses your real repository and your completed run card.
 5. Link the Session 5 before-and-after file from the Compound row. That file must link the regression case.
 6. Add your run-shape sentence.
 7. Name the person who made the release decision.
-8. Name one remaining blind spot.
+8. Name the remaining risk in one sentence.
 9. Answer “What does this evidence still not prove?” in three sentences or fewer.
 10. Open every link as a reader who has no access to your local files.
 
@@ -163,7 +163,7 @@ The Maven Project 3 page owns the grading contract. There is no separate Session
 - [ ] The Compound row links one retained change and its before-and-after evidence.
 - [ ] The run-shape field names the shape and the problem that requires it.
 - [ ] The release-owner field names one person.
-- [ ] The remaining-risk field names one remaining blind spot.
+- [ ] The remaining-risk field is one sentence: what can still be wrong.
 - [ ] Every run-card row links a file that opens for the reviewer.
 - [ ] The card answers what the evidence does not prove.
 - [ ] You submitted the card through Maven Student Home → Project 3.
@@ -522,7 +522,7 @@ git status
 
 Record one trust gap in `FIELD-NOTES.md`.
 
-### Break one connection
+### Break one seam
 
 Stage a temporary workflow:
 
@@ -569,12 +569,13 @@ Then:
 3. Make its contract check your S5 evaluation pack.
 4. Decide whether the shared budget must change.
 5. Record the budget reason in one comment.
-6. Run the workflow with `--wf sessions/s6-compose-defend/my/workflow.yaml`.
-7. Run the join.
-8. Add one deterministic refusal row that the supplied attack script lacks.
-9. Run the new refusal three times.
-10. Use `promote.sh` with a named owner and a real rollback path.
-11. Save the five receipts, join transcript, refusal, and promotion record.
+6. Before each run, start the candidate red: `cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs`. The inspect node expects the failing start, and a green leftover burns the shared budget on refusals.
+7. Run the workflow with `--wf sessions/s6-compose-defend/my/workflow.yaml`.
+8. Run the join.
+9. Add one deterministic refusal row that the supplied attack script lacks.
+10. Run the new refusal three times.
+11. Use `promote.sh` with a named owner and a real rollback path.
+12. Save the five receipts, join transcript, refusal, and promotion record.
 
 ### Short attacks
 

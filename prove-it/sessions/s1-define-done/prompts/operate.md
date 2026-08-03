@@ -22,10 +22,10 @@ decide, the contract stays yours.
 > write `TODO-OPERATOR` and say why. Do not write files; output the YAML in
 > the chat.
 >
-> Task: <one paragraph on the fixture task — the slugify behavior in
-> `working/`, in your own words. For the real-repo contract you freeze in the
-> transfer section, run this brief again with your real task instead — that
-> draft goes to its own file, never to `done/contract.yaml`>
+> Task: <one paragraph on your task, in your own words. In the lab, that is
+> the slugify behavior in `working/`. For the real-repo contract you freeze in
+> the transfer section, that is your real task — and that draft goes to its
+> own file, never to `done/contract.yaml`>
 
 Expected: a draft with visible `TODO-OPERATOR` holes rather than confident
 filler. An agent that fills every field smoothly from a vague paragraph is

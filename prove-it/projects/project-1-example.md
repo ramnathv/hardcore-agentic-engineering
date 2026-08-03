@@ -4,6 +4,11 @@
 > submission will differ in content and match in shape. The evidence paths
 > here are illustrative; in your submission each one is a real link that
 > opens on your branch.
+>
+> Your files carry the session names — `projects/project-1-contract.yaml`,
+> `project-1-goal.md`, `project-1-rider.md`, and
+> `projects/project-1-evidence/first-run.md`. This example names its files by
+> content instead. The shape is what transfers, not the names.
 
 ## The result I attempted
 
@@ -45,7 +50,8 @@ in its workspace. Then the gate ruled:
 root and signed `control/receipts/p1-dedupe.json`, and
 `node src/loop.ts complete p1-dedupe` verified it — both in the prove-it
 clone on this branch. The payments repo was read, hashed and judged, never
-written to.
+written to. In your submission, this section is one link:
+`projects/project-1-evidence/first-run.md`.
 
 ## The doubt I still have
 

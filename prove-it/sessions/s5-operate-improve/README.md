@@ -69,7 +69,7 @@ bash scripts/demo-compare.sh s5 --mock
 
 Look for the target case failure, the passing holdout, and the room decision. The runner prints the path of the saved compare artifact.
 
-If `tmux` is not installed, the lanes run one after the other. The evidence is the same.
+If `tmux` is not installed, the lanes run one after the other. The evidence is the same. If `tmux` opens but cannot attach, run the same command with `--seq`.
 
 ### Your task
 
@@ -79,6 +79,8 @@ Write this sentence in the Compound row of `PROOF.md`:
 > is ___, and I will compare the result before and after ___.
 
 Use your own failed run. Do not use the supplied answer.
+
+The class sentence is a draft. Before you submit, replace it with the final Compound evidence — the before-and-after link that [the week 3 page](https://hardcoreagentic.com/course/homework/week-3.html) asks for.
 
 ### Save
 
@@ -199,7 +201,7 @@ PIT="$(pwd)"                                   # your real checkout; step 12 com
 ```
 
 ```sh
-T="$(mktemp -d)"; cp -R "$PIT" "$T/prove-it" && cd "$T/prove-it" || exit 1
+T="$(mktemp -d)"; echo "temp copy: $T"; cp -R "$PIT" "$T/prove-it" && cd "$T/prove-it" || exit 1
 ```
 
 ```sh
@@ -511,7 +513,10 @@ Fill the table from steps 8, 9, and 10. Record the change, hypothesis, target ca
 If you opened a new terminal, rebuild `$PIT` and `$T` from your current directory:
 
 ```sh
-# new terminal since step 1? both variables are gone. Rebuild them from where you stand:
+# new terminal since step 1? both variables are gone. First cd into the
+# temporary copy — step 1 printed its path as "temp copy: …":
+#   cd <temp copy>/prove-it
+# Then rebuild both variables from where you stand:
 #   PIT=/path/to/your/real/prove-it ; T="$(dirname "$(pwd)")"
 ```
 
@@ -581,7 +586,7 @@ bash sessions/s5-operate-improve/fixtures/checks/eval-case-check.sh fixtures/eva
 
 ### Measure grader agreement
 
-Use the ten labeled rows from the original session material or Maven recording. Calculate:
+Build ten rows from your own history: label ten evaluation reports `PASS` or `FAIL` twice, one day apart, and treat the two passes as adjudicators A and B. Calculate:
 
 1. The count for each label pair.
 2. Raw agreement, `Po`.

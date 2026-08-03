@@ -111,7 +111,7 @@ Close one loophole with one exact edit. Add a check line or a `must_not_change` 
 
 ### Save
 
-Save these results after class:
+Save these results after class. Create `projects/project-1.md` if it does not exist — [project-1-example.md](../../projects/project-1-example.md) shows a finished one.
 
 - your edit to `fixtures/weak-contract.yaml`
 - this project sentence in `projects/project-1.md`:
@@ -172,7 +172,7 @@ The output is the identity of this contract version. A later edit creates a new 
 > [!NOTE]
 > **Optional evidence upgrade:** [PORT.md](../../PORT.md) lets the course gate read and judge your repository. Project 1 does not require a ported receipt.
 
-If you choose PORT, open the run from the `prove-it` root:
+If you choose PORT, first read [PORT.md](../../PORT.md) and add `candidate_dir` and `protect` to your contract. Then open the run from the `prove-it` root:
 
 ```sh
 node src/loop.ts open --run-id port-1 --contract projects/project-1-contract.yaml
@@ -192,7 +192,7 @@ Complete the run:
 node src/loop.ts complete port-1
 ```
 
-PORT adds `candidate_dir` and `protect` to the contract. Read [PORT.md](../../PORT.md) before you add them.
+If you revise the contract after open, open a new run with a new run ID. The old run stays as evidence.
 
 The decisive output is a receipt at `control/receipts/port-1.json` or an honest refusal. Keep that evidence in the `prove-it` clone.
 
@@ -557,6 +557,12 @@ dr-gate: ACCEPTED — receipt at control/receipts/forge-drill.json
   run=forge-drill contract=sha256:<your v2 sha>… check=check-v1 candidate=tree:a71862e1d0e8…
 dr-gate: VERIFIED — run=forge-drill contract=sha256:<your v2 sha>… check=check-v1 candidate=tree:a71862e1d0e8…
 run=forge-drill status=completed (receipt verified by dr-gate)
+```
+
+Restore the supplied contract before the next session. Later sessions print its `ceaaf…` hash:
+
+```sh
+git checkout -- done/contract.yaml
 ```
 
 The signature is the only difference between the forged and accepted receipts.

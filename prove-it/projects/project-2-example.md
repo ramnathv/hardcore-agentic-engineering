@@ -2,6 +2,12 @@
 
 > Week 2 of the same fictional task. Same repository, same run, further along.
 > Evidence paths are illustrative; yours are real links on your branch.
+>
+> One difference from the Session 4 steps, named up front: this example
+> attacked from the check side — it weakened the check to prove the green was
+> not evidence. The Session 4 steps attack from the result side — make one
+> real case wrong, then strengthen the check to catch it. Either direction
+> fills the same five headings and the same six grading boxes.
 
 ## The moment the run became uncertain
 

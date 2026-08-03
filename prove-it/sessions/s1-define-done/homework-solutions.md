@@ -6,7 +6,7 @@ string the shipped gate actually prints (all verified against the core).
 
 ---
 
-## B4 — the versioned second check (reference; README "Promote an observation to a check")
+## B4 — the versioned second check (reference; README "Turn an observation into a check")
 
 The promoted check, added under `checks:` in v2 (verified working against
 the correct implementation; exits 1 against the naive one because the

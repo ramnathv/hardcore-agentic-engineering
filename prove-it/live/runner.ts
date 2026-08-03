@@ -53,6 +53,13 @@ import {
 } from './runtime/barriers.ts';
 import type { FrameName, LaneSide, PauseSpec, Scenario, Step } from './scenario.ts';
 
+// A node:test ancestor marks its children with NODE_TEST_CONTEXT, and a child
+// `node --test <check>` that sees it SKIPS the check silently — exit 0, no
+// output. A tmux server started under a test suite hands that mark to every
+// pane. Scrubbed here, once, so every step, gate, and check this process
+// spawns runs the same way it does from a clean shell.
+delete process.env.NODE_TEST_CONTEXT;
+
 const LIVE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(LIVE, '..');
 const MARKER = '.prove-it-live-lane'; // ownership marker: cleanup refuses dirs without it

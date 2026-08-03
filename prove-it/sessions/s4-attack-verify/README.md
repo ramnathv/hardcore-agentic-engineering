@@ -106,7 +106,7 @@ PIT="$(pwd)"
 mkdir -p projects/project-2-evidence
 ```
 
-4. Switch to a non-main branch in your real repository.
+4. Go to your real repository: `cd <path-to-your-repository>`. Then switch to a non-main branch there.
 5. Choose one trusted test, fixture, or CI check.
 6. Record its current command.
 7. Create one nearby wrong result that the check accepts.
@@ -152,9 +152,9 @@ A truthful refusal counts as evidence. Do not change it into a passing result fo
 
 ### Save and submit
 
-- **Save:** Write the five Project headings in `projects/project-2.md`.
+- **Save:** Write the five Project headings in `projects/project-2.md`. They are listed on [the week 2 page](https://hardcoreagentic.com/course/homework/week-2.html), and [project-2-example.md](../../projects/project-2-example.md) shows a finished one.
 - **Evidence:** Commit `projects/project-2-evidence/` on the same `project-2` branch.
-- **Link:** Add `[Wrong case and evidence](project-2-evidence/wrong-case.md)` under the relevant Project headings.
+- **Link:** Add `[Wrong case and evidence](project-2-evidence/wrong-case.md)` under "The case I made wrong on purpose" and "The evidence that came back".
 - **Link from:** After submission, add one evidence link to the Verify row of [`PROOF.md`](../../PROOF.md).
 - **Submit:** Paste the `project-2` branch link in the Maven Project 2 item.
 - **Due:** Friday 14 August.
@@ -237,6 +237,12 @@ the three attacks this fixture supports:
            then: dr-gate verify friday   → expect: receipt stale: candidate tree mismatch
   forgery  write $PROVE_IT_ROOT/control/receipts/monday.json by hand
            then: dr-gate verify monday   → expect: receipt not issued by this gate
+```
+
+The printed path sets only `PROVE_IT_ROOT`. Before cleanup, save the same path in `S4_LAB`:
+
+```sh
+export S4_LAB="$PROVE_IT_ROOT"
 ```
 
 ### Read the honest receipt

@@ -93,7 +93,7 @@ then write the one script.
 ### Rider
 
 **Context.** Course rule: evidence is retained output plus the command that
-produced it, never a narrative summary. The nine setup tasks are in
+produced it, never a narrative summary. The four setup tasks are in
 `sessions/s0-setup/README.md`. The capture must include at least: the
 failing check (exit 1 — capture it WITHOUT letting it abort the script),
 the smoke run, `cat runs/<id>/events.jsonl`, the RunView, `dr-gate check`,

@@ -50,7 +50,45 @@ The path rules, exactly:
 fixture: it pins the tests so the worker cannot pass by weakening them. Protect
 your test files, not your source — the source is supposed to change.
 
+Before you open your first ported run, replace the teaching key. The starter
+ships `control/gate.key` so the fixture works on day one, and a shared key
+signs receipts anyone could forge:
+
+```sh
+head -c 64 /dev/urandom | xxd -p -c 64 > control/gate.key
+```
+
+Do this once, before the first ported run. The gate will not verify receipts
+signed by the old key, so a late swap orphans every receipt you already earned.
+
 ## The three commands
+
+Where each step runs, and where your agent runs:
+
+```text
+what runs                            where
+──────────────────────────────────   ────────────────────────────
+node src/loop.ts open …              the prove-it clone
+  pins the contract sha, your
+  candidate tree, and every
+  protected test — before any work
+
+your agent does the task             YOUR repository, your own
+  Claude Code, Codex, whatever you   tools. The harness is not
+  already run — exactly as in        in this loop. Your repo is
+  weeks 1 and 2                      read, hashed, and judged —
+                                     never written to.
+
+node control/dr-gate.ts check …      the prove-it clone
+  re-reads the pins, re-hashes
+  your repo, runs the named check
+  from your repo root → a signed
+  receipt, or a truthful refusal
+
+node src/loop.ts complete …          the prove-it clone
+  verifies the receipt, and only
+  then records the run completed
+```
 
 ```
 node src/loop.ts open --run-id port-1 --contract /path/to/my-repo-contract.yaml
@@ -103,8 +141,3 @@ than fake a session, and the ported lifecycle is open → check → complete, wi
 your own agent doing the work in between. The gate proves your named checks
 passed against an untampered tree — it does not prove your checks are adequate.
 Strengthening them when a fault survives is still your job, same as Session 4.
-
-`control/gate.key` is a teaching artifact that lets the starter work. Before
-you gate your own repo, replace it with
-`head -c 64 /dev/urandom | xxd -p -c 64 > control/gate.key`. The gate will not
-verify old receipts after you replace the key.
