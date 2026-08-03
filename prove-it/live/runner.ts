@@ -63,8 +63,11 @@ delete process.env.NODE_TEST_CONTEXT;
 const LIVE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(LIVE, '..');
 const MARKER = '.prove-it-live-lane'; // ownership marker: cleanup refuses dirs without it
-const HEAD_LINES = 2;
-const TAIL_LINES = 1;
+// --details widens the same throttle instead of removing it: the artifact is
+// still the complete record, and a 300-line test run would drown the frames.
+// (process.argv directly — the flag helpers are declared further down.)
+const HEAD_LINES = process.argv.includes('--details') ? 12 : 2;
+const TAIL_LINES = process.argv.includes('--details') ? 6 : 1;
 
 const C = {
   reset: '\x1b[0m',

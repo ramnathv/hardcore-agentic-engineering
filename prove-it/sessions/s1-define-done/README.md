@@ -118,13 +118,17 @@ Save these results after class. Create `projects/project-1.md` if it does not ex
 
 > The contract line I will use in `<your repository>` is `<the line>`. It closes `<the exploit>`.
 
+Put this sentence under `## The contract, fixed before the run started` in
+`projects/project-1.md`.
+
 The weak-contract edit is practice. The project sentence moves your real task forward.
 
 ## Apply
 
 ### Use this in your project
 
-Project 1 is one real-repository run. Maven Project 1 owns its grading contract.
+Project 1 is one real-repository run. The Week 1 Project boxes are the grading
+contract. Maven holds the submission control and status.
 
 #### Draft the contract
 
