@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // Render an events.jsonl as a readable timeline, one line per event.
 //
-//   node scripts/timeline.mjs runs/<run-id>/events.jsonl
-//   node scripts/timeline.mjs live/artifacts/<dir>/right/shared/events.jsonl
+//   node scripts/timeline.mjs                                  newest live artifact, all lanes
+//   node scripts/timeline.mjs live/artifacts/<dir>             one artifact, all lanes
+//   node scripts/timeline.mjs runs/<run-id>                    one student run
+//   node scripts/timeline.mjs runs/<run-id>/events.jsonl       any log file directly
 //
 // Works on both logs the course produces: the student loop (src/loop.ts) and
 // the live runtime (live/runtime/). It renders what the record holds and
 // invents nothing: an unknown event type prints as itself, and a torn final
 // record — a crash mid-write — is shown as exactly that, the same way the
 // readers in src/events.ts and live/runtime/event-log.ts treat it.
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const C = {
@@ -112,10 +114,43 @@ function describe(e) {
   }
 }
 
-const files = process.argv.slice(2);
+// An argument may be a log file, a run directory, or a whole compare artifact.
+// A compare artifact expands to its lanes in story order: the shared first
+// process, then the lane that dropped it, then the lane that kept it.
+function expand(arg) {
+  if (!existsSync(arg)) return [arg]; // let the missing-file message name it
+  if (statSync(arg).isFile()) return [arg];
+  const lanes = ['prefix', 'left', 'right']
+    .map((lane) => join(arg, lane, 'shared', 'events.jsonl'))
+    .filter((p) => existsSync(p));
+  if (lanes.length) return lanes;
+  for (const candidate of [join(arg, 'events.jsonl'), join(arg, 'shared', 'events.jsonl')])
+    if (existsSync(candidate)) return [candidate];
+  return [arg];
+}
+
+// No argument: the newest compare artifact that actually holds event logs —
+// a --mock artifact keeps none, and picking it would render nothing.
+function newestArtifact() {
+  const root = join('live', 'artifacts');
+  if (!existsSync(root)) return null;
+  const dirs = readdirSync(root)
+    .map((name) => join(root, name))
+    .filter((p) => statSync(p).isDirectory())
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return dirs.find((dir) => expand(dir).some((p) => existsSync(p))) ?? null;
+}
+
+let files = process.argv.slice(2).flatMap(expand);
 if (files.length === 0) {
-  console.error('usage: node scripts/timeline.mjs <events.jsonl> [more.jsonl ...]');
-  process.exit(1);
+  const latest = newestArtifact();
+  if (!latest) {
+    console.error('usage: node scripts/timeline.mjs [<artifact-dir> | <run-dir> | <events.jsonl> ...]');
+    console.error('  (no live/artifacts with event logs found here — real runs produce them; --mock does not)');
+    process.exit(1);
+  }
+  console.log(`${C.dim}newest artifact: ${latest}${C.reset}`);
+  files = expand(latest);
 }
 
 for (const path of files) {
