@@ -10,6 +10,7 @@
 // record — a crash mid-write — is shown as exactly that, the same way the
 // readers in src/events.ts and live/runtime/event-log.ts treat it.
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const C = {
   reset: '\x1b[0m',
@@ -126,6 +127,20 @@ for (const path of files) {
     continue;
   }
   console.log(`\n${C.bold}${path}${C.reset}`);
+  // A compare lane that forked with --drop-events holds no trace of the shared
+  // first process. That absence is the lesson, but on screen it reads as a
+  // gap — so name it, and point at the file that holds the missing history.
+  const laneDir = dirname(dirname(path));
+  const prefixLog = join(dirname(laneDir), 'prefix', 'shared', 'events.jsonl');
+  if (!laneDir.endsWith('prefix') && existsSync(prefixLog)) {
+    const first = readFileSync(path, 'utf8').split('\n').find((l) => l.trim());
+    const prefixFirst = readFileSync(prefixLog, 'utf8').split('\n').find((l) => l.trim());
+    if (first && prefixFirst && first !== prefixFirst)
+      console.log(
+        `${C.orange}      note: this lane kept no record of the shared first process — its history\n` +
+          `      was dropped at fork. The interrupted run lives in ${prefixLog}${C.reset}`,
+      );
+  }
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     if (!line.trim()) continue;
     let e;
