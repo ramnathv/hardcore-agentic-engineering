@@ -39,7 +39,7 @@ A **holdout** is a second case that you did not use to design the change. It hel
 2. Find one run that failed, disappointed you, or remains hard to explain.
 3. Bring that run before 5pm Tuesday 18 August.
 
-The live session runs Tuesday 18 August, from 5pm to 7pm ET. Open the Zoom link from Maven Student Home.
+The live session runs Tuesday 18 August, from 5pm to 7pm ET. Open the Zoom link from Maven Student Home. The course commands need Node 22.18 or newer — check with `node --version`.
 
 ## During the live session
 
@@ -250,6 +250,8 @@ run=demo status=completed (receipt verified by dr-gate)
       24 runs/demo/events.jsonl
 ```
 
+On Linux, `wc` prints the `24` without the leading spaces.
+
 The `complete` command checks the receipt before it records `completed`.
 
 ### 3. Read the run
@@ -451,8 +453,8 @@ Save this output before you change the harness.
 Change the default reconciliation:
 
 ```sh
-sed -i '' "s/const rec = opt('--reconcile');/const rec = opt('--reconcile') ?? 'ok';/" src/loop.ts
-# GNU sed: drop the '' after -i. Either way, you can edit the `const rec` line (~172) by hand instead.
+sed -i.bak "s/const rec = opt('--reconcile');/const rec = opt('--reconcile') ?? 'ok';/" src/loop.ts && rm -f src/loop.ts.bak
+# Or edit the `const rec` line (~172) by hand instead.
 grep -n "reconcile') ??" src/loop.ts
 ```
 
@@ -528,7 +530,7 @@ cp -R runs/c03 runs/c03b runs/c01 "$PIT/runs/evidence-resume/"
 cp runs/before-after-resume.md "$PIT/runs/"
 cp -R runs/demo "$PIT/runs/"                       # the hand-off pack
 cp control/receipts/demo.json "$PIT/control/receipts/"   # the receipt it links
-cp fixtures/eval/cases/06-*.yaml "$PIT/fixtures/eval/cases/"   # case 06
+cp fixtures/eval/cases/06-*.yaml "$PIT/fixtures/eval/cases/"   # case 06 — skip if you skipped step 7
 cd "$PIT" && rm -rf "$T"
 bash sessions/s5-operate-improve/fixtures/checks/before-after-check.sh runs/before-after-resume.md
 ```

@@ -106,7 +106,7 @@ const scenario: Scenario = {
       say: 'A fresh worker starts. It receives the original brief, because that is all there is.',
       realCmd:
         `${CLI} claude --task slugify --run-id {{runid}} ` +
-        `--reuse-stage $TMPDIR/prove-it-live/{{runid}} --artifact {{artifact}}/left --timeout 240`,
+        `--reuse-stage \${TMPDIR:-/tmp}/prove-it-live/{{runid}} --artifact {{artifact}}/left --timeout 240`,
     },
     {
       lane: 'left',

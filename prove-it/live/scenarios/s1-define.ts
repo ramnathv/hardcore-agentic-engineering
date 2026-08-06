@@ -115,7 +115,7 @@ const scenario: Scenario = {
       frame: 'VERDICT',
       extract: '# fail \\d+',
       say: 'The named check runs only after the claim was accepted.',
-      realCmd: 'cd $TMPDIR/prove-it-live/{{runid}} && node --test working/test/slugify.test.mjs || true',
+      realCmd: 'cd ${TMPDIR:-/tmp}/prove-it-live/{{runid}} && node --test working/test/slugify.test.mjs || true',
     },
 
     // RIGHT — the same claim, under the gate. Mock keeps the keyless smoke
@@ -166,8 +166,8 @@ const scenario: Scenario = {
       // The gate judged the run the stage was opened under — the shared
       // prefix's name — so that is the receipt on disk in this lane's stage.
       realCmd:
-        `head -n 8 $TMPDIR/prove-it-live/{{runid}}/control/receipts/{{shared}}.json; ` +
-        `grep '"sig"' $TMPDIR/prove-it-live/{{runid}}/control/receipts/{{shared}}.json`,
+        `head -n 8 \${TMPDIR:-/tmp}/prove-it-live/{{runid}}/control/receipts/{{shared}}.json; ` +
+        `grep '"sig"' \${TMPDIR:-/tmp}/prove-it-live/{{runid}}/control/receipts/{{shared}}.json`,
     },
     {
       lane: 'right',

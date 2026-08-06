@@ -239,6 +239,7 @@ function assertStaged(cwd: string, stage: string) {
 
 function childEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, NODE_NO_WARNINGS: '1' };
+  if (!env.TMPDIR) env.TMPDIR = tmpdir(); // Linux leaves TMPDIR unset; scenario commands expand $TMPDIR
   delete env.PROVE_IT_ROOT; // the staged copy resolves its own root; never inherit one
   return env;
 }

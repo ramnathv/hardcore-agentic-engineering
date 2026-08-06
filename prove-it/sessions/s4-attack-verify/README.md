@@ -30,7 +30,7 @@ A passing check proves more after you see it fail on a relevant wrong result.
 2. Find one passing test, fixture, or CI command that you do not fully trust.
 3. Bring that check before 5pm Thursday 13 August.
 
-The session is Thursday 13 August, 5pm to 7pm ET. Your copy of the comparison needs no key or network access.
+The session is Thursday 13 August, 5pm to 7pm ET. Your copy of the comparison needs no key or network access. It needs Node 22.18 or newer — check with `node --version`.
 
 A **gate** is the course command that runs the checks and creates a signed result. That signed result is a **receipt**.
 

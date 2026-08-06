@@ -1,1 +1,5 @@
 .DS_Store
+
+# private session history and editor state — never ship
+.specstory/
+.cursorindexingignore

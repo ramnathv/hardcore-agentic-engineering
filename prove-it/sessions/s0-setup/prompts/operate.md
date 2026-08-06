@@ -58,7 +58,8 @@ bash scripts/probe.sh
 
 The supplied baseline (macOS or Linux, no OS sandbox): rows 2, 3, 4 and 6
 REFUSED by tool-layer policy, row 1 ALLOWED, row 5 UNSUPPORTED, closing
-lines `contained: 0 of 6.` and `UNSUPPORTED IS NOT CONTAINED`. Operate it
+lines `4 of 6 refused by tool-layer policy · 0 of 6 contained by the OS.`
+and `UNSUPPORTED IS NOT CONTAINED`. Operate it
 like an instrument, not a test to pass:
 
 - Same output as baseline → write "matches baseline; tool-layer refusals
@@ -92,7 +93,8 @@ evidence report, no fixes.
 > [paste the full green-check output here]
 > ```
 
-Operator checks afterward: `git status --short` is empty (the fence held);
+Operator checks afterward: `git status --short -- src control working done
+scripts` is empty (the fence held — untracked `runs/` entries are expected);
 the proposed fix names a command, not a vibe; you ran the fix yourself and
 re-ran green-check to 8/8.
 

@@ -45,7 +45,7 @@ run=b1 status=budget_exhausted — stop or escalate. Do not reset the budget wit
 ```
 
 `grep '"type":"run.budget_exhausted"'` hits, `model_claimed_done` absent,
-`view` shows `"status": "budget_exhausted"`, `npm test` stays green (9 pass).
+`view` shows `"status": "budget_exhausted"`, `npm test` stays green (19 pass).
 
 Grading notes: the event must be appended before returning (a crash between
 decision and record loses the boundary); actor is `harness`, not `worker` —

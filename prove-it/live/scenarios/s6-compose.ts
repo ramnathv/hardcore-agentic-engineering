@@ -15,7 +15,7 @@ const CLI = 'node live/runtime/cli.ts';
 // the same node evidence — the brief is explicit that the node work happens a
 // single time and is shared, so the lanes differ only in what their fan-in is
 // permitted to trust.
-const COORD_STAGE = '$TMPDIR/prove-it-live/{{shared}}';
+const COORD_STAGE = '${TMPDIR:-/tmp}/prove-it-live/{{shared}}';
 // The workflow id is the scenario's, not the brief's — the lanes read the
 // evidence back by that name, so the coordinator has to be told it.
 const COORDINATE =

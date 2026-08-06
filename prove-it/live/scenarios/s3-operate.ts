@@ -35,7 +35,7 @@ const CRASH = 'PROVE_IT_LIVE_CRASH_AT=after_effect PROVE_IT_LIVE_CRASH_AT_TOOL=s
 // Both modes report the verdict in one vocabulary, so the battery asserts the
 // same thing whether a fixture or an agent produced it.
 const LEDGER_ASSERT = (run: string) =>
-  `node -e "const f=process.env.TMPDIR+'/prove-it-live/${run}/live-state/ledger.jsonl';` +
+  `node -e "const f=(process.env.TMPDIR||require('os').tmpdir())+'/prove-it-live/${run}/live-state/ledger.jsonl';` +
   `const c=require('fs').existsSync(f)?require('fs').readFileSync(f,'utf8').trim().split('\\n').filter(Boolean).length:0;` +
   `console.log('ledger: '+(c===1?'PASS':'FAIL')+' — '+c+' entr'+(c===1?'y':'ies')+' for one intent')"`;
 
@@ -105,7 +105,7 @@ const scenario: Scenario = {
       mockCmd: `${LEDGER} send --to ops --amount 5 --ledger runs/{{runid}}-ledger.jsonl`,
       realCmd:
         `${CLI} claude --task payment --run-id {{runid}} ` +
-        `--reuse-stage $TMPDIR/prove-it-live/{{runid}} --artifact {{artifact}}/left ` +
+        `--reuse-stage \${TMPDIR:-/tmp}/prove-it-live/{{runid}} --artifact {{artifact}}/left ` +
         `--tools read_file,write_file,run_check,send_payment --timeout 240`,
     },
     {

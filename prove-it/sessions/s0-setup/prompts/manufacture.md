@@ -65,7 +65,7 @@ say so. Or the row list needs a row I did not approve.
 
 ```sh
 bash sessions/s0-setup/student/readiness.sh; test $? -eq 0
-env PATH=/nonexistent bash sessions/s0-setup/student/readiness.sh; test $? -ne 0
+env PATH=/nonexistent /bin/bash sessions/s0-setup/student/readiness.sh; test $? -ne 0
 bash sessions/s0-setup/student/readiness.sh | grep -c "READY\|BLOCKED\|PRESENT\|ABSENT\|INFO"   # >= 8 labeled rows
 ```
 

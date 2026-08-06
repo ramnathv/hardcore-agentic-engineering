@@ -13,7 +13,10 @@ const SEED =
 
 // The screen confirms the same product-source hash in both lanes before
 // anything runs — the START frames must be identical.
-const HASH = 'shasum -a 256 working/src/slugify.mjs';
+// sha256sum on Linux, shasum on macOS before Ventura — identical output.
+const HASH =
+  'command -v sha256sum >/dev/null && sha256sum working/src/slugify.mjs' +
+  ' || shasum -a 256 working/src/slugify.mjs';
 
 // tee keeps the three adequacy states on disk inside the staged copy, so
 // CONTROL and VERDICT extract from the one run instead of re-running it.
@@ -30,7 +33,7 @@ const AGENT_CHECK = 'working/test/agent-strengthened.test.mjs';
 const AUTHOR =
   `${CLI} claude --task check-author --run-id {{runid}} ` +
   `--seed-product working/src/slugify.mjs --artifact {{artifact}}/right --timeout 300; ` +
-  `cp "$TMPDIR/prove-it-live/{{runid}}/working/test/strengthened.test.mjs" ${AGENT_CHECK}`;
+  `cp "\${TMPDIR:-/tmp}/prove-it-live/{{runid}}/working/test/strengthened.test.mjs" ${AGENT_CHECK}`;
 
 // The room-seeded faulty candidate is the product both lanes certify. In mock
 // no worker runs at all; in real, an agent authors the right lane's check.

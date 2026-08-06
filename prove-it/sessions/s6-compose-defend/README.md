@@ -63,7 +63,7 @@ Before class:
 1. Read [Chapter 6](https://hardcoreagentic.com/course/reader/06-compose-defend.html). Allow about 10 minutes.
 2. Bring `PROOF.md` before 5pm Thursday 20 August.
 
-The live session runs Thursday 20 August, from 5pm to 7pm ET. Open the Zoom link from Maven Student Home.
+The live session runs Thursday 20 August, from 5pm to 7pm ET. Open the Zoom link from Maven Student Home. The course commands need Node 22.18 or newer — check with `node --version`.
 
 ## During the live session
 

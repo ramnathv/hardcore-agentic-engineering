@@ -40,8 +40,9 @@ you believe the agent.
 
 - `node src/loop.ts open --run-id probe-p1`
   currently succeeds and writes a `run.json` with no goal/rider fields.
-- `wc -m prompts/goal-m03.md` prints 1665 — the worked goal is under the
-  4,000-char course limit and is your test asset.
+- `wc -m prompts/goal-m03.md` prints 1665 (1671 in a shell without a UTF-8
+  locale) — the worked goal is under the 4,000-char course limit and is your
+  test asset.
 
 #### Focus files
 
@@ -62,8 +63,8 @@ you believe the agent.
 
 - Do not remove or rename any existing field or event; add only.
 - Do not touch `control/`, `done/contract.yaml`, `working/`, or core tests.
-- No dependencies. Character count = `.length` of the decoded UTF-8 string
-  (what `wc -m` counts here), not bytes.
+- No dependencies. Character count = `.length` of the decoded UTF-8 string,
+  not bytes. (`wc -m` matches only in a UTF-8 locale.)
 
 #### Stop-when
 

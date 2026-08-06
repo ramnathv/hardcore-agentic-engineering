@@ -48,6 +48,10 @@ Node runs the TypeScript files directly. There is no install or build step.
 Linux works as written. Linux temporary paths begin with `/tmp/` instead of
 the macOS `/var/folders/` path shown in some examples.
 
+On Ubuntu and Debian, `apt install nodejs` installs a version far older than
+the course needs. Install Node 22.18 or newer with nvm or from nodesource.com.
+If your machine has no `shasum`, use `sha256sum` — the output is identical.
+
 On Windows, use WSL2 with Ubuntu. Native PowerShell and Command Prompt cannot
 run the course scripts.
 
@@ -150,6 +154,9 @@ Fill every field. Keep the finished card under 2,000 characters.
 ```sh
 wc -m < your-task-card.md
 ```
+
+In a shell without a UTF-8 locale, `wc -m` counts bytes and reads slightly
+high — so a count that passes is safely under the limit.
 
 Paste the exact check command into the card. Run that command and make sure
 that it fails today.

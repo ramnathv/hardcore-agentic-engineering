@@ -72,7 +72,7 @@ builtin true). Verified against the starter with the stub still red:
 ```sh
 T="$(mktemp -d)"; cp -R control working done fixtures "$T/"; mkdir -p "$T/runs"
 export PROVE_IT_ROOT="$T"
-sed -i '' 's#command: node --test working/test/slugify.test.mjs#& || :#' "$T/done/contract.yaml"
+sed -i.bak 's#command: node --test working/test/slugify.test.mjs#& || :#' "$T/done/contract.yaml"
 node src/loop.ts open --run-id lintgap
 node control/dr-gate.ts check lintgap
 #   dr-gate: ACCEPTED — receipt at control/receipts/lintgap.json     ← failing suite, green receipt

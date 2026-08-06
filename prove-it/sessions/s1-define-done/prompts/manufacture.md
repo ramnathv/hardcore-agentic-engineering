@@ -171,7 +171,7 @@ Done when the four-command sequence below behaves as stated.
 
 - New files only, under `sessions/s1-define-done/bin/`. `.pins/` entries are
   runtime output, not committed artifacts.
-- No imports from `src/`; no dependencies; must run on bare Node 20+.
+- No imports from `src/`; no dependencies; must run on bare Node 22.18+.
 - Do not touch `runs/`, `control/`, `done/`.
 
 #### Stop-when

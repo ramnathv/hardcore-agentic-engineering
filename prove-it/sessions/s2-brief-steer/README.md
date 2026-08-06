@@ -318,6 +318,8 @@ wc -m prompts/goal-m03.md
 1665 prompts/goal-m03.md
 ```
 
+A shell without a UTF-8 locale counts bytes and prints 1671 — same file.
+
 The goal stays short because the rider contains the detailed context.
 
 ### Interrupt and resume
@@ -436,7 +438,8 @@ Measure your goal from the `prove-it` root:
 wc -m projects/project-1-goal.md
 ```
 
-If the result is more than 4,000, move details from the goal to the rider.
+If the result is more than 4,000, move details from the goal to the rider. In
+a shell without a UTF-8 locale, `wc -m` counts bytes and reads slightly high.
 
 ### Project the event log
 

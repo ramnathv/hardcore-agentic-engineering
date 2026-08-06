@@ -55,7 +55,7 @@ ships `control/gate.key` so the fixture works on day one, and a shared key
 signs receipts anyone could forge:
 
 ```sh
-head -c 64 /dev/urandom | xxd -p -c 64 > control/gate.key
+openssl rand -hex 64 > control/gate.key
 ```
 
 Do this once, before the first ported run. The gate will not verify receipts

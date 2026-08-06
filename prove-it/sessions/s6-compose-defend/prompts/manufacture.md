@@ -231,7 +231,8 @@ join: REFUSED — budget invariant violated: runner 0 + children 7 (inspect:1 im
 shapes); `control/dr-gate.ts` verify branch (what the gate already refuses —
 do not re-implement signature checking, request `verify`);
 `scripts/tamper-table.sh` (the row/verdict script pattern to copy);
-`fixtures/join-attacks.sh` reference only after yours runs.
+`sessions/s6-compose-defend/fixtures/join-attacks.sh` reference only after
+yours runs.
 
 **Deliverable spec (3 items).**
 1. `join` subcommand with the five ordered checks and named-evidence
@@ -299,8 +300,8 @@ promote: recorded at runs/demo/promotion.json
 ```
 
 **Focus files.** Your Pair 2/3 runner (where children are spawned — the env
-export lives there); `fixtures/promote.sh` reference after yours works;
-`MILESTONES.md` M12 row.
+export lives there); `sessions/s6-compose-defend/fixtures/promote.sh`
+reference after yours works; `MILESTONES.md` M12 row.
 
 **Deliverable spec (3 items).**
 1. `my/promote.sh` with the four refusal/consume behaviors above.

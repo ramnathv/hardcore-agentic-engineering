@@ -5,7 +5,7 @@ or a provider binary: Phase 1 ships the deterministic smoke adapter, and the
 Claude adapter arrives in Phase 2.
 
 Every command below passes `--tmp`, so a rehearsal writes its evidence under
-`$TMPDIR/prove-it-live-artifacts/` and leaves the checkout alone. Drop `--tmp`
+`${TMPDIR:-/tmp}/prove-it-live-artifacts/` and leaves the checkout alone. Drop `--tmp`
 when you want the run kept in `live/artifacts/` like a real comparison.
 
 The gate the brief sets for this phase is four statements. Sections 1 to 4
@@ -58,7 +58,7 @@ out because the harness ran the check and handed back the failure.
 an `Artifact:` path. Open it:
 
 ```sh
-D=$(ls -td "$TMPDIR"/prove-it-live-artifacts/smoke-slugify-* | head -1)
+D=$(ls -td "${TMPDIR:-/tmp}"/prove-it-live-artifacts/smoke-slugify-* | head -1)
 ls "$D"/shared/tools/          # args.json + result.json + stdout/stderr per call
 grep -c message.delta "$D"/shared/provider.raw.jsonl   # streaming text is kept raw
 grep -c message.delta "$D"/shared/events.jsonl         # expect 0 — the log keeps whole messages
@@ -118,8 +118,8 @@ echo "exit=$?"     # expect 9
 **Look at the world and the log, separately:**
 
 ```sh
-cat "$TMPDIR/prove-it-live/demo1/live-state/ledger.jsonl"   # ONE payment happened
-D=$(ls -td "$TMPDIR"/prove-it-live-artifacts/smoke-payment-* | head -1)
+cat "${TMPDIR:-/tmp}/prove-it-live/demo1/live-state/ledger.jsonl"   # ONE payment happened
+D=$(ls -td "${TMPDIR:-/tmp}"/prove-it-live-artifacts/smoke-payment-* | head -1)
 tail -1 "$D"/shared/events.jsonl | node -e 'process.stdin.on("data",d=>console.log(JSON.parse(d).type))'
 ```
 
@@ -161,7 +161,7 @@ reads the durable conversation, sees the operator's decision, and calls
 `status needs_evidence`.
 
 ```sh
-wc -l "$TMPDIR/prove-it-live/demo1/live-state/ledger.jsonl"   # still 1
+wc -l "${TMPDIR:-/tmp}/prove-it-live/demo1/live-state/ledger.jsonl"   # still 1
 ```
 
 **The harder decision is worth seeing too.** Repeat the sequence with
@@ -179,11 +179,11 @@ holds one entry. That is what the key is for.
 ## 4. Clean up
 
 ```sh
-rm -rf "$TMPDIR"/prove-it-live "$TMPDIR"/prove-it-live-artifacts
+rm -rf "${TMPDIR:-/tmp}"/prove-it-live "${TMPDIR:-/tmp}"/prove-it-live-artifacts
 ```
 
 `live/artifacts/` is git-ignored and is now excluded from the course site build
-(`scripts/build-course-site.sh`). Stages live under `$TMPDIR/prove-it-live/`.
+(`scripts/build-course-site.sh`). Stages live under `${TMPDIR:-/tmp}/prove-it-live/`.
 
 ---
 
