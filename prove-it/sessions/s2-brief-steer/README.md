@@ -92,7 +92,7 @@ The launcher is the shared compare step. The interrupt below is your personal ac
 3. Read only its `World truth` line.
 4. Open [prompts/operate.md](prompts/operate.md).
 5. Write the fact on the four-line bet card.
-6. If `s2-steer` exists, replace it with a fresh run ID in the next two commands.
+6. If `s2-steer` exists, replace it with a fresh run ID in the next three commands.
 7. Run the interrupt from the `prove-it` root.
 
 ```sh
@@ -105,7 +105,15 @@ node src/loop.ts run --provider smoke --run-id s2-steer --interrupt-after 2
 grep run.interrupted runs/s2-steer/events.jsonl
 ```
 
-9. Restore the failing fixture.
+9. Read the whole run as a timeline.
+
+```sh
+node scripts/timeline.mjs runs/s2-steer/events.jsonl
+```
+
+Each starred line is an operator writing into the record.
+
+10. Restore the failing fixture.
 
 ```sh
 cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
