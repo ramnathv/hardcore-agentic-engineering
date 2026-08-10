@@ -214,6 +214,54 @@ test('a contract with inline comments pins and protects exactly like a bare one'
   }
 });
 
+// Regression, found by a student reading the two parsers against each other:
+// a full-line comment inside the protect block used to END the gate's block
+// match while parseContract skipped it and kept collecting. Open pinned every
+// entry, the gate re-parsed only the ones above the comment, and the entries
+// below it were never verified — a protected test could be weakened and still
+// earn a receipt. The old guard missed it because it only fired on a ZERO
+// parse. A blank line inside the block did the same thing, with no comment
+// involved. Both shapes must now protect every entry.
+for (const [shape, divider] of [
+  ['a full-line comment', '  # the fixtures below are negative controls'],
+  ['a blank line', ''],
+] as const) {
+  test(`${shape} inside the protect block still protects every entry below it`, () => {
+    const { root, cleanup } = makeFixtureRoot();
+    const student = makeStudentRepo();
+    try {
+      const fixtures = join(student.repo, 'test', 'fixtures.json');
+      writeFileSync(fixtures, '{ "cases": ["1s", "2m"] }\n');
+      writeFileSync(
+        student.contract,
+        CONTRACT.replace(
+          '  - myrepo/test/parse-duration.test.mjs\nchecks:',
+          `  - myrepo/test/parse-duration.test.mjs\n${divider}\n  - myrepo/test/fixtures.json\nchecks:`,
+        ),
+      );
+
+      assert.equal(loop(root, ['open', '--run-id', 'pd', '--contract', student.contract]).status, 0);
+      const run = JSON.parse(readFileSync(join(root, 'runs', 'pd', 'run.json'), 'utf8'));
+      assert.equal(Object.keys(run.protected).length, 2, 'open pins both entries');
+
+      // Tamper with the entry BELOW the divider — the one the old gate dropped.
+      appendFileSync(fixtures, '// weakened\n');
+      const c = gate(root, ['check', 'pd']);
+      assert.notEqual(c.status, 0, 'the gate must refuse a tampered entry below the divider');
+      assert.match(c.out, /protected check target modified: myrepo\/test\/fixtures\.json/);
+
+      // Restored, the contract mints a receipt like a bare one.
+      writeFileSync(fixtures, '{ "cases": ["1s", "2m"] }\n');
+      const ok = gate(root, ['check', 'pd']);
+      assert.equal(ok.status, 0, ok.out);
+      assert.match(ok.out, /check=protect/);
+    } finally {
+      cleanup();
+      student.cleanup();
+    }
+  });
+}
+
 test('ported runs keep every gate tooth: smoke worker refused, forged receipt refused, moved goalposts refused', () => {
   const { root, cleanup } = makeFixtureRoot();
   const student = makeStudentRepo();

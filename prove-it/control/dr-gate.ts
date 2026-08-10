@@ -54,8 +54,12 @@ function parsePort(raw: string): { candidateDir?: string; protect: string[] } {
   const cd = raw.match(/^candidate_dir:[ \t]*(.+)$/m)?.[1];
   const candidateDir = cd ? uncomment(cd) || undefined : undefined;
   const protect: string[] = [];
-  const block = raw.match(/^protect:[ \t]*(?:#.*)?\n((?:[ \t]+-[ \t]+.+\n?)*)/m)?.[1] ?? '';
-  for (const m of block.matchAll(/-[ \t]+(.+)/g)) {
+  // A full-line comment or a blank line inside the block does not end it —
+  // parseContract skips both and stays in the section, so this must too, or the
+  // two parsers disagree about the same bytes. Item extraction is anchored to
+  // the line start: a dash inside a comment is prose, not a protected path.
+  const block = raw.match(/^protect:[ \t]*(?:#.*)?\n((?:[ \t]*(?:#.*)?\n|[ \t]+-[ \t]+.+\n?)*)/m)?.[1] ?? '';
+  for (const m of block.matchAll(/^[ \t]+-[ \t]+(.+)$/gm)) {
     const entry = uncomment(m[1]);
     if (entry) protect.push(entry);
   }
@@ -88,9 +92,14 @@ if (cmd === 'check') {
   const port = parsePort(raw); // safe: parsed from the bytes the sha just pinned
   // Belt and braces: `loop open` pinned protect hashes this parser cannot see
   // again means the two parsers disagree about the same bytes. Refuse; never
-  // fall back to the fixture manifest on a ported run.
-  if (run.protected && Object.keys(run.protected).length > 0 && port.protect.length === 0)
-    refuse('run pins protected files but the contract parses to none — gate and open disagree');
+  // fall back to the fixture manifest on a ported run. Counts, not emptiness:
+  // a parser that sees SOME of the block is the dangerous case, because the
+  // pins it drops are never verified and nothing else here would notice.
+  const pinned = Object.keys(run.protected ?? {});
+  if (pinned.length > 0 && pinned.length !== port.protect.length)
+    refuse(
+      `protect parse mismatch: open pinned ${pinned.length} file(s), gate parses ${port.protect.length} — gate and open disagree`,
+    );
   if (port.protect.length > 0) {
     // Ported: the student's protect list replaces the fixture manifest. The
     // pins were hashed at `loop open` into run.json; a protected file edited
