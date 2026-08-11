@@ -1,0 +1,192 @@
+---
+title: "Session 2 — Brief and steer a durable run"
+subtitle: "Hardcore Agentic Engineering · `prove-it`"
+author: "Ramnath Vaidyanathan"
+date: today
+engine: knitr
+---
+
+## The question this session answers
+
+Session 1 froze the definition of done before the run. But runs are not
+one-shot. Halfway through, you notice the agent is working from a false premise
+— it thinks the legacy queue is writable, and it isn't.
+
+You correct it. Where does that correction live?
+
+If you typed it into a chat window, it lives in a process. Kill the process and
+it is gone. Start a fresh agent tomorrow from the same brief and it makes the
+same mistake, because nothing you said was ever written down.
+
+> A chat correction disappears. A fact in the rider survives.
+
+## Start from a known state
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+echo "reset: no runs, no receipts, candidate red"
+```
+
+---
+
+## The compare
+
+Both lanes start from the same short brief and no previous chat. In the left
+lane the operator states a correction and saves it nowhere. In the right lane
+the same correction becomes a run event.
+
+```{bash}
+bash scripts/demo-compare.sh s2 --mock --seq 2>&1 \
+  | sed $'s/\033\[[0-9;]*m//g' \
+  | tail -12
+```
+
+The left correction dies with the conversation. The right one becomes part of
+the record the next agent reads.
+
+---
+
+## Interrupt a run
+
+An **interrupt** stops a run and records the stop position in its log.
+
+```{bash}
+node src/loop.ts run --provider smoke --run-id s2-steer --interrupt-after 2 2>&1 | tail -3
+```
+
+The process is gone; the run state remains:
+
+```{bash}
+node src/loop.ts view s2-steer | grep status
+```
+
+### What the interrupt actually recorded
+
+```{bash}
+grep run.interrupted runs/s2-steer/events.jsonl
+```
+
+::: {.callout-important}
+## The point of the whole session
+
+`{"after_turn": 2}` — and nothing else.
+
+The **position** is durable. The **reason** is not. The log knows exactly where
+the run stopped and has no idea why. If the cause of the stop was "the legacy
+queue is read-only in this environment," that fact exists nowhere except in my
+head and a dead terminal.
+
+The supplied `--interrupt-after` cannot record a fact. Building an
+`interrupt --fact` is an optional Go-deeper exercise (`prompts/manufacture.md`,
+P3).
+:::
+
+### The run as a timeline
+
+Each starred line is an operator writing into the record.
+
+```{bash}
+node scripts/timeline.mjs runs/s2-steer/events.jsonl 2>&1 \
+  | sed $'s/\033\[[0-9;]*m//g'
+```
+
+### Resume reads the log, not the process
+
+```{bash}
+node src/loop.ts resume s2-steer 2>&1 | tail -4
+```
+
+It continued at turn 3. Turns 1 and 2 were not replayed — the event log is the
+state, and the process was only ever a way of appending to it.
+
+```{bash}
+node control/dr-gate.ts check s2-steer 2>&1 | head -1
+node src/loop.ts complete s2-steer 2>&1 | tail -1
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+```
+
+---
+
+## A log that *does* carry the fact
+
+The course ships a hand-written exhibit showing what a durable correction looks
+like when the harness can record one.
+
+```{bash}
+bash sessions/s2-brief-steer/fixtures/make-steering-run.sh 2>&1 | head -2
+echo "---"
+grep -E 'plan.rejected|run.rebriefed' runs/fx-steering/events.jsonl
+```
+
+Two events, two different jobs:
+
+- `plan.rejected` carries the **fact** — *the legacy queue is read-only in this
+  environment*
+- `run.rebriefed` carries the **new instruction** — retries go through the
+  outbox table
+
+A fresh agent reading this log starts with both. A fresh agent reading my
+`s2-steer` log above starts with neither.
+
+---
+
+## Steer, or new contract?
+
+The decision at every interrupt:
+
+> Does this new fact correct the **route**, or change the **definition of done**?
+
+| | Goes where | Why |
+|---|---|---|
+| Route correction | the rider | the outcome did not change; only the path to it did |
+| Changed result | a **new contract version** | new hash, new run — the gate refuses an edit in place |
+
+Getting this wrong in the second direction is the expensive one. Quietly
+widening what "done" means mid-run is how a run succeeds against a target
+nobody agreed to. The gate makes it impossible to do accidentally:
+
+```
+contract hash mismatch: contract changed after the run was opened
+```
+
+---
+
+## Goal and rider
+
+- A **goal** states the result and the operating limits. Short.
+- A **rider** holds the detailed context a fresh agent needs. Everything else.
+
+The split exists so the goal stays readable. The worked example:
+
+```{bash}
+wc -m prompts/goal-m03.md prompts/rider-m03.md
+```
+
+A **fresh agent** starts with no earlier conversation, which is the whole point:
+it forces the written brief to carry the work. Anything I "already told it" is
+not in the brief, and will not survive.
+
+The optional rider format has six sections: Context, Live evidence, Focus files,
+Deliverable (three items max), Fences, Stop-when.
+
+---
+
+## My real task
+
+*To come — the goal and rider for `tidycba2`, including the one fact an agent
+cannot read from the files, and the stop condition that catches the wrong
+premise.*
+
+---
+
+## Reset
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+node --test working/test/slugify.test.mjs > /dev/null 2>&1
+echo "reset complete — candidate back to red (exit=$?)"
+```

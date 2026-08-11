@@ -5,3 +5,10 @@ node_modules/
 
 # Live compare artifacts are per-run evidence, retained locally, never committed.
 live/artifacts/
+
+# Quarto build output — the .qmd sources are the artifact worth keeping.
+lab/docs/_site/
+.quarto/
+
+/.quarto/
+**/*.quarto_ipynb

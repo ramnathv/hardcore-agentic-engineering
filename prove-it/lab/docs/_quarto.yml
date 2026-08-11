@@ -1,0 +1,65 @@
+# Quarto site for my prove-it course notes.
+#
+# The project lives in lab/docs/, but the CHUNKS must run two levels up, in the
+# prove-it root — otherwise `node src/loop.ts …` and `bash scripts/probe.sh`
+# would need `../../` prefixes and would stop matching the session guides
+# verbatim. `opts_knit: root.dir: "../.."` does that: sources in lab/docs/,
+# execution in prove-it/.
+#
+# Each .qmd must declare `engine: knitr` in its own front matter. Without it
+# Quarto sees ```{bash} chunks and reaches for Jupyter instead.
+#
+#   quarto render lab/docs                 the whole site
+#   quarto render lab/docs/session-0.qmd   one page
+#   quarto preview lab/docs                live reload while writing
+
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "prove-it — course notes"
+  description: "Hardcore Agentic Engineering, worked through one session at a time."
+  reader-mode: true
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+    right:
+      - icon: github
+        href: https://github.com/ramnathv/hardcore-agentic-engineering
+  sidebar:
+    style: docked
+    search: true
+    contents:
+      - href: index.qmd
+        text: Overview
+      - section: "Sessions"
+        contents:
+          - href: session-0.qmd
+            text: "S0 · Setup"
+          - href: session-1.qmd
+            text: "S1 · Define done"
+          - href: session-2.qmd
+            text: "S2 · Brief and steer"
+          - href: session-3.qmd
+            text: "S3 · Control plane"
+  page-footer:
+    left: "Notes on [prove-it](https://github.com/specstoryai/hardcore-agentic-engineering)"
+    right: "Every output on this site is executed, not pasted."
+
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 3
+    code-overflow: wrap
+    code-copy: true
+
+knitr:
+  opts_knit:
+    root.dir: "../.."
+  opts_chunk:
+    error: true
+    comment: ""
+    collapse: false

@@ -1,0 +1,94 @@
+---
+title: "prove-it — course notes"
+subtitle: "Hardcore Agentic Engineering, worked one session at a time"
+author: "Ramnath Vaidyanathan"
+date: today
+---
+
+## What this is
+
+My notes on [`prove-it`](https://github.com/specstoryai/hardcore-agentic-engineering),
+the practice harness for Hardcore Agentic Engineering — a small TypeScript agent
+loop with a gate at the exit.
+
+Every output on this site is **executed at render time**, not pasted. If a claim
+here is wrong, the page fails to build. That is the harness's own discipline
+turned on my notes about it.
+
+## The idea in one paragraph
+
+An agent writes the code, writes the test, runs the test, reads the output, and
+reports the result. Every link in the evidence chain routes through the party
+being judged. `prove-it` answers that with a split enforced by directory:
+`working/` is the only place worker tools can write, and `control/` is
+host-owned — the gate, its signing key, the contracts, the receipts. A run
+completes only when `dr-gate` reruns the agreed checks **itself** and signs a
+receipt.
+
+The worker's "done" is an opinion. Only the gate records completion.
+
+## Sessions
+
+| | Session | Outcome | Notes |
+|---|---|---|---|
+| **S0** | [Setup, and the whole loop once](session-0.qmd) | — | ✅ written |
+| S1 | Define done before the run | Define | to come |
+| S2 | Brief and steer a durable run | Brief | to come |
+| S3 | The control plane | Operate | to come |
+| S4 | Attack and verify | Verify | to come |
+| S5 | Operate and improve | Compound | to come |
+| S6 | Compose and defend | Compound | to come |
+
+## Command reference
+
+The harness surface, and what each command touches.
+
+| Command | Owner | What it does | Writes / edits |
+|---|---|---|---|
+| `loop open --run-id X` | worker side | Pins identities before any work | `runs/X/run.json`, `runs/X/events.jsonl` |
+| `loop run --provider smoke --run-id X` | worker side | `open`, then drives the agent's turns | the above, plus `working/src/slugify.mjs` |
+| `loop resume X` | worker side | Continues an interrupted run from the log | appends events; edits `working/` |
+| `loop cancel X --reason "…"` | worker side | Ends a run deliberately | appends `run.cancelled` |
+| `loop view X [--full]` | worker side | Folds the event log into a status | **nothing** |
+| `loop complete X` | worker side | Asks the gate to verify, then records | appends `gate.result`, `run.completed` |
+| **`dr-gate check X`** | **control** | **The judgment** — reruns the checks, signs | `runs/X/check-output.txt`, `control/receipts/X.json` |
+| **`dr-gate verify X`** | **control** | **Re-validation** of an existing receipt | **nothing — read-only** |
+
+`check` produces the verdict and is the only command that runs your check
+command. `verify` runs nothing and re-reads a receipt. `complete` never judges
+anything itself — it shells out to `dr-gate verify` and acts on the answer.
+
+## The refusals
+
+A gate is worth exactly what it refuses.
+
+| Attack | Refusal |
+|---|---|
+| Alter the signature | `receipt not issued by this gate: signature does not verify` |
+| Change the code after signing | `receipt stale: candidate tree mismatch` |
+| Edit the contract after `open` | `contract hash mismatch: contract changed after the run was opened` |
+| Reuse a valid receipt on another run | `receipt run mismatch: replay of run '…'` |
+| Edit a pinned file | `protected check target modified: …` |
+| Muzzle a check command | `suppressed check: '…' in '…'` |
+
+The fourth is the one worth remembering: the signature verifies perfectly — the
+payload is genuine — and it still refuses, because the run identity is wrong.
+**A true receipt can still be the wrong receipt.**
+
+## What a receipt does *not* say
+
+> These named checks, run by the gate itself, against this exact tree, with
+> these protected files byte-identical to `open`, under these exact contract
+> bytes, produced these exit codes.
+
+That is the whole claim. It says nothing about whether the checks were
+*adequate*, and no mechanism anywhere in the system does. That gap is the course.
+
+Two consequences I keep having to relearn:
+
+1. **`protect` has teeth; `must_not_change` is a comment.** The gate parses
+   `must_not_change` and never reads it again. On my own repository there is no
+   fixture manifest, so `protect:` is the only mechanism with force.
+2. **A check never seen red is not a check.** Run it against known-broken code
+   and watch it fail before trusting it green. Reading the command cannot tell
+   you the difference.

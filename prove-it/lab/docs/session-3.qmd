@@ -1,0 +1,184 @@
+---
+title: "Session 3 — Build the control plane"
+subtitle: "Hardcore Agentic Engineering · `prove-it`"
+author: "Ramnath Vaidyanathan"
+date: today
+engine: knitr
+---
+
+## The question this session answers
+
+The harness logs `tool.requested`, dispatches the tool, then logs `tool.result`.
+Kill the process between those two lines and the log holds a request with no
+result.
+
+On restart you cannot tell whether the side effect happened. For `run_check`
+that is harmless. For `send_payment` it is a second charge.
+
+> A crashed run must not repeat an external action until you know what happened.
+
+`needs_reconcile` means **"I do not know."** It does not mean "it failed." Most
+of this session is about keeping those two apart.
+
+If you have done distributed systems, this is at-least-once versus exactly-once
+delivery, and the request ID is the dedupe key.
+
+## Start from a known state
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+echo "reset: no runs, no receipts, candidate red"
+```
+
+---
+
+## The double payment
+
+The fixture ledger is a file standing in for a network service. The file is
+simulated; the uncertain external effect is real.
+
+```{bash}
+L=sessions/s3-control-plane/fixtures/ledger.mjs
+node $L reset
+node $L send --to ops --amount 5 --crash-before-record
+node $L send --to ops --amount 5
+node $L assert-count --to ops --n 1; echo "exit=$?"
+```
+
+Read the crash message carefully: **entry #1 IS in the ledger.** The payment
+succeeded. What failed was the confirmation reaching the caller.
+
+So the retry is not recovering from a failure. It is repeating a success,
+because the caller could not tell the difference.
+
+## The idempotency key
+
+An **idempotency key** is a stable request ID that makes a repeated request
+harmless. Same crash, same retry, one difference:
+
+```{bash}
+L=sessions/s3-control-plane/fixtures/ledger.mjs
+node $L reset
+node $L send --to ops --amount 5 --key pay-2026-08-11-ops-5 --crash-before-record
+node $L send --to ops --amount 5 --key pay-2026-08-11-ops-5
+node $L assert-count --to ops --n 1; echo "exit=$?"
+```
+
+`idempotent replay: key … already recorded as entry #1 — no new external effect`
+
+::: {.callout-important}
+## Name the intent, not the attempt
+
+`pay-2026-08-11-ops-5` identifies **one payment** and stays the same across
+retries.
+
+A fresh timestamp or UUID per attempt describes a **new request** — which is
+exactly what you do not want, and is the default in most retry code. The key has
+to be chosen *before* dispatch and reused, or it buys nothing.
+:::
+
+---
+
+## A pending action in the harness
+
+Same problem, inside the run loop. The fixture crashes after dispatching a tool
+but before recording its result.
+
+```{bash}
+PROVE_IT_CRASH_AT_TOOL=3 node src/loop.ts run --provider smoke --run-id s3-crash 2>&1 | tail -2
+```
+
+```{bash}
+node src/loop.ts view s3-crash | grep status
+```
+
+### Resume refuses to guess
+
+```{bash}
+node src/loop.ts resume s3-crash 2>&1; echo "exit=$?"
+```
+
+The harness will not decide for you, and will not silently retry. It names the
+pending action and hands back three options.
+
+### The three controls
+
+| Control | Use when |
+|---|---|
+| `--reconcile ok` | evidence shows the action happened |
+| `--reconcile failed` | evidence shows it did not |
+| `--reconcile in_doubt` | the evidence cannot settle it |
+
+The third is the one that matters. An honest `in_doubt` beats a comfortable
+guess in either direction — the same instinct as `LostContainment` in
+`CHALLENGE.md` Tier 3(f): *if you cannot prove the stop was clean, do not record
+a clean stop.*
+
+### Read the evidence, then decide
+
+The pending tool here is `run_check`, so the evidence is just running it:
+
+```{bash}
+node --test working/test/slugify.test.mjs > /dev/null 2>&1
+echo "the check actually exits: $?"
+```
+
+It failed, so `failed` is the honest reconciliation:
+
+```{bash}
+node src/loop.ts resume s3-crash --reconcile failed 2>&1 | tail -3
+```
+
+That decision becomes an operator-authored `tool.result` event — a human
+judgement, recorded as evidence, distinguishable in the log from something the
+harness observed:
+
+```{bash}
+grep '"actor":"operator"' runs/s3-crash/events.jsonl | tail -1
+```
+
+---
+
+## The compare
+
+Both lanes start after the same crash. The blind retry sends the payment again.
+The evidence-first recovery reads the ledger before it acts.
+
+```{bash}
+bash scripts/demo-compare.sh s3 --mock --seq 2>&1 \
+  | sed $'s/\033\[[0-9;]*m//g' \
+  | tail -14
+```
+
+---
+
+## My real task
+
+*To come — for Project 2:*
+
+1. *the moment the run became uncertain*
+2. *the evidence I read before continuing*
+3. *the control I chose*
+4. *why that control fit the evidence*
+
+*Plus one idempotency key for a real external action. If no control exists,
+`no control exists` is the honest answer.*
+
+For `tidycba2` the interesting property is that the task is **read-mostly** —
+the gate reads and hashes, never writes. The external actions worth naming are
+the ones outside the gate's view.
+
+---
+
+## Reset
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+rm -f runs/s3-ledger.jsonl
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+node --test working/test/slugify.test.mjs > /dev/null 2>&1
+echo "reset complete — candidate back to red (exit=$?), ledger cleared"
+```

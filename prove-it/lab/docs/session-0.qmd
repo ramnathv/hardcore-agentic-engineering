@@ -1,0 +1,441 @@
+---
+title: "Session 0 — Setup, and the whole loop once"
+subtitle: "Hardcore Agentic Engineering · `prove-it`"
+author: "Ramnath Vaidyanathan"
+date: today
+engine: knitr
+---
+
+## What this document is
+
+A runnable version of the Session 0 guide. Every claim below is executed, not
+asserted — which is the harness's own discipline applied to my notes about it.
+
+Render it from the `prove-it` directory:
+
+```sh
+quarto render lab/docs/session-0.qmd   # this page
+quarto render lab/docs                 # the whole site
+quarto preview lab/docs                # live reload while writing
+```
+
+The source lives in `lab/docs/`, but `_quarto.yml` sets
+`opts_knit: root.dir: "../.."`, so chunks execute two levels up in `prove-it/`.
+That is why every command below reads exactly as it does in the session
+guides — no `../`, no `cd`.
+
+::: {.callout-note}
+## Reading exit codes
+
+Half of this document is about commands that fail **on purpose**. A test that
+goes red, a gate that refuses. So chunks use this pattern throughout:
+
+```bash
+some-command > /dev/null 2>&1; rc=$?
+echo "exit=$rc"
+```
+
+The redirect keeps the transcript readable, `rc=$?` captures the status before
+anything clobbers it, and the final `echo` lets the chunk itself succeed so the
+render continues. `0` means success; anything else is a failure.
+:::
+
+## Start from a known state
+
+Every chunk below assumes no leftover runs. This makes the document
+idempotent — render it as many times as you like.
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+echo "reset: no runs, no receipts, candidate restored to the broken stub"
+```
+
+---
+
+## The idea in one paragraph
+
+An agent writes the code, writes the test, runs the test, reads the output, and
+reports the result. Every link in the evidence chain routes through the party
+being judged. `prove-it` answers that with a split enforced by directory:
+`working/` is the only place worker tools can write, and `control/` is
+host-owned — the gate, its signing key, the contracts, the receipts.
+
+A run completes only when `dr-gate` reruns the agreed checks **itself** and
+signs a receipt. Everything that follows is an elaboration of that sentence.
+
+---
+
+## Task 1 — Readiness
+
+The first question is whether the course runs on this machine at all. Every row
+of this script is an actual attempt: it really reads the Node version, really
+writes into `runs/`, really looks for a provider CLI on `PATH`.
+
+
+```{bash}
+bash sessions/s0-setup/fixtures/readiness.sh
+```
+
+Required rows must say `READY`. The `claude` and `codex` rows may say `ABSENT` —
+the required path is keyless and offline.
+
+## Task 2 — The green check
+
+This drives the entire workflow once, in a throwaway copy under `/tmp`, and
+asserts eight things along the way. It never touches this checkout, so it can be
+run at any time without cleaning up first.
+
+```{bash}
+bash scripts/green-check.sh
+```
+
+The eight assertions in four groups:
+
+| Group | Asserts |
+|---|---|
+| Is the task real? | the stub fails; the agent completes its turns; the check then passes |
+| Does the evidence path work? | the gate issues a receipt; completion consumes it |
+| Does the gate refuse? | a forged signature is rejected; a stale tree is rejected |
+| Is the contract sound? | the shipped contract parses and is accepted |
+
+Two details worth noticing in the source. The forgery and staleness assertions
+don't merely check for a non-zero exit — they grep for the *exact* refusal
+string, so the test can't pass because the gate crashed on a typo. And the
+script deliberately declines to test OS containment, saying so in its own
+footer. That question gets its own section below.
+
+---
+
+## The loop, one step at a time
+
+```
+contract  →  open  →  work  →  dr-gate check  →  complete
+```
+
+### The contract
+
+The loop does not start with work. It starts with a written definition of done,
+frozen before anyone touches anything.
+
+```{bash}
+cat done/contract.yaml
+```
+
+Eight keys — and they are **not** equal in force. Only some are enforced by the
+gate; the rest are prose for humans:
+
+| Enforced by the gate | Declarative only |
+|---|---|
+| `checks` — rerun, exit code compared | `outcome` |
+| `protect` — hashed at open, re-verified | `runtime_observation` |
+| the contract's own sha256 | `must_change` / `must_not_change` |
+| | `budgets`, `stop_and_ask`, `release_owner` |
+
+`must_not_change` really is in the right-hand column. Proof:
+
+```{bash}
+gate=$(grep -c "must_not_change" control/dr-gate.ts)
+parser=$(grep -c "must_not_change" src/contract.ts)
+echo "must_not_change in src/contract.ts (parsed): $parser"
+echo "must_not_change in control/dr-gate.ts (enforced): $gate"
+```
+
+It reads like a guarantee and functions as a comment. What actually protects the
+fixture's test file is a host-owned manifest:
+
+```{bash}
+cat control/checks/manifest.json
+```
+
+That distinction is the single most important thing to carry into my own
+contract, where there is no manifest and `protect:` is the only mechanism with
+teeth.
+
+### `open` — freeze the identities
+
+`open` does no work. It records what is about to be judged.
+
+```{bash}
+node src/loop.ts open --run-id demo
+echo "---"
+cat runs/demo/run.json
+```
+
+The rule: **the definition and the yardstick are frozen; the thing being
+measured is free to move.** `contract_sha256` must not change — moving it is
+moving the goalposts. `candidate_tree_start` is expected to change, because
+changing it is the work.
+
+(`candidate_tree_start` is recorded and then never read by the gate. It is
+provenance, not a constraint. The tree hash that can refuse you is a different
+one, taken later at `check`.)
+
+### The candidate starts red
+
+The shipped `slugify.mjs` throws. This is deliberate: a check that has never
+been seen failing is not a check.
+
+```{bash}
+node --test working/test/slugify.test.mjs 2>&1 | tail -6
+```
+
+```{bash}
+node --test working/test/slugify.test.mjs > /dev/null 2>&1; rc=$?
+echo "exit=$rc"
+```
+
+### The worker works
+
+`--provider smoke` is a scripted fake agent — no API key, no network, the same
+code path a real provider would take.
+
+```{bash}
+node src/loop.ts run --provider smoke --run-id first
+```
+
+It read the file, wrote an implementation, ran the check, failed, wrote again,
+and passed. Its closing line is a claim of completion.
+
+The status is `needs_evidence`.
+
+### The claim buys nothing
+
+The code works and the test passes. Claim the run is done.
+
+```{bash}
+node src/loop.ts complete first; rc=$?
+echo "exit=$rc"
+```
+
+`complete` forms no opinion of its own. It shells out to the gate and asks a
+single question — *is there a valid receipt?* — and there isn't. The word
+`completed` cannot be written by anything on the worker's side of the house.
+
+### `dr-gate check` — the judgment
+
+The gate re-reads the contract and confirms its hash still matches what `open`
+pinned, verifies the protected test file is untouched, hashes the candidate
+tree, then **runs the check command itself** in a fresh subprocess and compares
+the exit code. Only then does it sign.
+
+```{bash}
+node control/dr-gate.ts check first
+```
+
+### The receipt
+
+```{bash}
+cat control/receipts/first.json
+```
+
+Four identities, the check results, and one signature:
+
+- `contract_sha256` — which definition of done
+- `check_version` — which checks
+- `candidate_tree` — which exact bytes of code
+- `run_id` — which run (this is what defeats replay)
+- `sig` — an HMAC keyed with `control/gate.key`, which the worker cannot read
+
+Every field is reconstructible from worker context **except** `sig`. That is the
+whole security argument.
+
+The receipt asserts exactly this:
+
+> These named checks, run by the gate itself, against this exact tree, with
+> these protected files byte-identical to `open`, under these exact contract
+> bytes, produced these exit codes.
+
+It does **not** assert that the checks were adequate.
+
+### `complete` — now it lands
+
+```{bash}
+node src/loop.ts complete first
+```
+
+---
+
+## Three refusals
+
+A gate is worth exactly what it refuses.
+
+### 1. A forged signature
+
+Every field is genuine except `sig`.
+
+```{bash}
+node --input-type=module -e "
+import { readFileSync, writeFileSync } from 'node:fs';
+const p = 'control/receipts/first.json';
+const j = JSON.parse(readFileSync(p, 'utf8'));
+const s = j.sig;
+j.sig = s.slice(0, -1) + (s.slice(-1) === 'a' ? 'b' : 'a');
+writeFileSync(p, JSON.stringify(j, null, 2));
+console.log('flipped one hex character of sig');
+"
+node control/dr-gate.ts verify first; rc=$?
+echo "exit=$rc"
+```
+
+### 2. A stale candidate
+
+Re-sign, then change the code *after* the receipt was issued.
+
+```{bash}
+node control/dr-gate.ts check first | head -1
+echo "--- now edit the checked file ---"
+echo "// drift" >> working/src/slugify.mjs
+node control/dr-gate.ts verify first; rc=$?
+echo "exit=$rc"
+```
+
+The receipt still describes code that no longer exists.
+
+### 3. A moved contract
+
+```{bash}
+git checkout -- working/src/slugify.mjs
+node src/loop.ts open --run-id goalpost
+echo "# small clarifying tweak" >> done/contract.yaml
+node control/dr-gate.ts check goalpost; rc=$?
+echo "exit=$rc"
+git checkout -- done/contract.yaml
+echo "(contract restored)"
+```
+
+Three attacks, three *different* refusal reasons. The gate names which pin
+broke rather than failing generically.
+
+A fourth is worth knowing without running it: copy a valid receipt onto another
+run and the signature still verifies perfectly — the payload is genuine — but
+`run_id` doesn't match, so it refuses with `receipt run mismatch`. **A true
+receipt can still be the wrong receipt.**
+
+---
+
+## What is *not* protected
+
+Everything above is enforced by the harness's own tool layer. Whether the
+operating system would stop a determined process is a separate question, and the
+probe answers it honestly.
+
+```{bash}
+bash scripts/probe.sh
+```
+
+Four of six actions are refused by tool-layer *policy*. Zero are contained by
+the OS. A policy refusal is not a sandbox, and the footer says so in as many
+words.
+
+---
+
+## Adequacy is not provenance
+
+The gate is rigorous about where a result came from and completely indifferent
+to whether the check was worth running. The course ships a deliberately weak
+contract to make the point:
+
+```{bash}
+cat sessions/s1-define-done/fixtures/weak-contract.yaml
+```
+
+Schema-complete — every required key present. It would pass any structural
+validation. Now run its two checks against the **untouched broken stub**:
+
+```{bash}
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+
+echo -n "the real test:      "
+node --test working/test/slugify.test.mjs > /dev/null 2>&1; echo "exit=$?"
+
+echo -n "weak check 1:       "
+node -e "import('./working/src/slugify.mjs').then(() => process.exit(0))" 2>/dev/null; echo "exit=$?"
+
+echo -n "weak check 2:       "
+bash -c 'node --test working/test/slugify.test.mjs || echo done anyway' > /dev/null 2>&1; echo "exit=$?"
+```
+
+Both of the weak contract's checks are green against code that is definitively
+broken. The exploit is not "cut corners" — it is **do nothing at all** and
+collect a valid signed receipt.
+
+They fail differently, and the distinction matters:
+
+- **Check 1 is vacuous.** It imports the module and never calls the function.
+  Nothing is suppressed; it runs honestly and exits 0 honestly. It proves the
+  file is syntactically valid JavaScript and nothing more.
+- **Check 2 is suppressed.** The real test runs and genuinely fails, and
+  `|| echo done anyway` discards the exit code. The failure output is still
+  printed, and still written to `check-output.txt` — legible to any human,
+  invisible to every mechanism in the system.
+
+The gate does defend against suppression, with a blocklist:
+
+```{bash}
+sed -n '14p' control/dr-gate.ts
+```
+
+Check `|| echo done anyway` against that list. It is not `|| true`. It is not a
+trailing `exit 0`. **It sails straight through.** A blocklist stops the
+suppression you thought of.
+
+::: {.callout-important}
+## The habit this buys
+
+**Run every check against known-broken code and watch it go red before trusting
+it.** A check never seen failing is not a check — it is a command that happens
+to exit 0, and reading it cannot tell you which. Check 1 looks entirely
+reasonable on the page and is inert.
+:::
+
+---
+
+## Task 3 — The real-repo task card
+
+The only Session 0 artifact that continues into the course. One real task from a
+repository I actually use, carried through all three weeks.
+
+```{bash}
+#| eval: false
+cp sessions/s0-setup/fixtures/real-repo-task-card.md your-task-card.md
+```
+
+The card must stay under 2,000 characters, and its named check must **fail
+today** — otherwise the task is already done and proves nothing.
+
+```{bash}
+#| eval: false
+wc -m < your-task-card.md
+```
+
+## Task 4 — Maven
+
+Mark setup complete and finish the pre-course reflection. Nothing to run.
+
+---
+
+## Reset
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+git checkout -- done/contract.yaml 2>/dev/null
+node --test working/test/slugify.test.mjs > /dev/null 2>&1
+echo "reset complete — candidate back to red (exit=$?), runs and receipts cleared"
+```
+
+---
+
+## What carries forward
+
+1. **The worker's "done" is an opinion.** Only a gate-verified receipt changes a
+   run's status.
+2. **A receipt binds provenance, not quality.** Which contract, which checks,
+   which bytes — never whether the checks were the right ones.
+3. **`protect` has teeth; `must_not_change` is a comment.** On my own repo there
+   is no manifest, so `protect:` is the only real mechanism.
+4. **A check never seen red is not a check.**
+5. **Policy refusal is not containment.** Zero of six, on this host.

@@ -1,0 +1,284 @@
+---
+title: "Session 1 — Define done before the run"
+subtitle: "Hardcore Agentic Engineering · `prove-it`"
+author: "Ramnath Vaidyanathan"
+date: today
+engine: knitr
+---
+
+## The question this session answers
+
+Session 0 established that the gate is rigorous about **provenance** — which
+contract, which checks, which bytes, signed by whom. It is entirely indifferent
+to **adequacy**.
+
+`dr-gate` runs whatever command sits in `checks:` and compares the exit code. If
+the check is worthless, it signs a receipt for worthless work, faithfully, with
+a valid signature binding the right tree and the right contract. Every refusal
+from Session 0 still fires correctly.
+
+So a receipt means exactly:
+
+> These checks ran and produced these exit codes.
+
+And never:
+
+> These checks were the right checks.
+
+Nothing in the system supports that second sentence. It has to be bought at
+contract-writing time, before the run — which is why this session comes first.
+
+## Start from a known state
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+git checkout -- working/test/slugify.test.mjs done/contract.yaml 2>/dev/null
+echo "reset: no runs, no receipts, candidate red, test and contract pristine"
+```
+
+---
+
+## The compare
+
+Two lanes, same contract, same task, same starting files. One control changes:
+who is allowed to decide the run is finished.
+
+```{bash}
+bash scripts/demo-compare.sh s1 --mock --seq 2>&1 \
+  | sed $'s/\033\[[0-9;]*m//g' \
+  | tail -14
+```
+
+`--mock` needs no API key, and `--seq` runs the lanes in sequence rather than in
+tmux panes — necessary in any non-interactive shell.
+
+The left lane trusts the worker's claim. The right lane requires a gate-verified
+receipt. That is the only difference between them.
+
+---
+
+## The weak contract
+
+The course ships a deliberately weak contract to attack. It is the same slugify
+task and it is **schema-complete** — every required key present. It would pass
+any structural validation.
+
+```{bash}
+cat sessions/s1-define-done/fixtures/weak-contract.yaml
+```
+
+Schema-complete is not attack-proof. The six questions below are the drill.
+
+---
+
+## The six loophole questions
+
+The method has two hats. As **author**, the contract must speak for itself —
+no verbal commentary on the side, because a cold agent gets only the file. As
+**attacker**, describe the laziest, cheapest result that makes every written
+check pass. Not being difficult; being an agent.
+
+An exploit names an exact edit, command, or omission. "It is vague" is not an
+exploit.
+
+### Q1 — Could the test already be green before the change?
+
+Yes. Check 1 is **vacuous**: it imports the module and never calls the function.
+The stub only throws when `slugify()` is invoked.
+
+Demonstrated against the untouched broken stub:
+
+```{bash}
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+
+echo -n "the real test:  "
+node --test working/test/slugify.test.mjs > /dev/null 2>&1; echo "exit=$?"
+
+echo -n "weak check 1:   "
+node -e "import('./working/src/slugify.mjs').then(() => process.exit(0))" 2>/dev/null; echo "exit=$?"
+
+echo -n "weak check 2:   "
+bash -c 'node --test working/test/slugify.test.mjs || echo done anyway' > /dev/null 2>&1; echo "exit=$?"
+```
+
+Both of the weak contract's checks are green against code that is definitively
+broken. The exploit is not "cut corners" — it is **do nothing at all** and
+collect a valid signed receipt.
+
+::: {.callout-important}
+## The habit this buys
+
+**Run every check against known-broken code and watch it go red before trusting
+it green.** A check never seen failing is not a check — it is a command that
+happens to exit 0, and reading it cannot tell you which. Check 1 looks perfectly
+reasonable on the page and is inert.
+
+This is why the fixture ships broken on purpose, and why `green-check.sh` spends
+its first assertion confirming the stub fails.
+:::
+
+### Q2 — Could the result be produced by changing a fixture?
+
+Yes, and it is the cheapest path of all. The weak contract's `must_not_change`
+lists only `control/`, so the test file is fair game. Rather than fix `slugify`,
+rewrite the assertions to expect whatever the broken code already does. The test
+then passes **honestly** — nothing suppressed, nothing vacuous, objective
+entirely missed.
+
+```{bash}
+cp working/test/slugify.test.mjs /tmp/slugify.test.real.mjs
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+
+cat > working/test/slugify.test.mjs <<'EOF'
+import { test } from 'node:test';
+test('the code is fine, trust me', () => {});
+EOF
+
+echo -n "weakened test vs broken code:  "
+node --test working/test/slugify.test.mjs > /dev/null 2>&1; echo "exit=$?"
+```
+
+The command passes. But this is the fixture, and the gate has something the weak
+contract does not:
+
+```{bash}
+node src/loop.ts open --run-id weakened > /dev/null 2>&1
+node control/dr-gate.ts check weakened 2>&1; echo "exit=$?"
+
+# restore
+cp /tmp/slugify.test.real.mjs working/test/slugify.test.mjs
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+```
+
+What refused it was **not** `must_not_change`. It was a host-owned manifest:
+
+```{bash}
+cat control/checks/manifest.json
+```
+
+::: {.callout-warning}
+## The trap in this question
+
+Adding the test file to `must_not_change` would **not** have closed this. The
+gate parses that key and never reads it again — `grep -c must_not_change
+control/dr-gate.ts` returns `0`. The fixture is safe because of
+`manifest.json`, which lives in `control/` where the worker cannot write.
+
+On my own repository there is no manifest. `protect:` is the only equivalent,
+and it is the only key with force.
+:::
+
+### Q3 — Could a required case be omitted?
+
+> `outcome: the slugify function handles special characters correctly`
+
+Yes. **"Special characters" names no cases, so the agent picks them.**
+
+The shipped test covers lowercasing, `&` → `and`, and collapsing runs. So
+implement exactly `&`, ship, and claim the outcome truthfully. Accented Latin
+(`café`), CJK, emoji, quotes, slashes, percent-encoding — all emphatically
+"special," all omitted, and no written word objects.
+
+```{bash}
+cp control/checks/fixtures/solution-correct.mjs working/src/slugify.mjs
+node --input-type=module -e "
+const { slugify } = await import('./working/src/slugify.mjs');
+for (const s of ['Rock & Roll!', 'Café Society', '日本語のタイトル', 'C++ vs C#']) {
+  console.log(JSON.stringify(s).padEnd(26), '→', JSON.stringify(slugify(s)));
+}
+"
+```
+
+The reference implementation passes every named check and still mangles three of
+those four. Nothing is broken — the contract simply never asked.
+
+The general form: **an unenumerated set in the outcome is a quantifier with no
+domain.** "Handles special characters," "improves error handling," "covers the
+edge cases" — in each, the agent chooses the membership, and it will choose the
+cheapest members.
+
+The fix is not a better adjective. It is moving the enumeration out of `outcome`
+and into `checks`, as named inputs with expected outputs.
+
+::: {.callout-tip}
+## Transfer to my own contract
+
+My `tidycba2` outcome already does this — *"proves 16 of 16 headings are covered
+and every case runs"* is an enumeration with a domain, not "the important
+gotchas." Q3 is closed there.
+
+Its exposure is Q2 instead: the thing counting to 16 is a script the agent
+writes.
+:::
+
+### Q4 — Could the command succeed without running the check?
+
+Yes. Check 2 ends `|| echo done anyway`. The real test runs, genuinely fails,
+and the `||` discards the exit code:
+
+```
+node --test …      → exits 1   (real failure)
+||                 → sees non-zero, runs the right side
+echo done anyway   → exits 0
+─────────────────────────────────
+compound           → exits 0
+```
+
+The failure output still prints, and the gate still writes it to
+`runs/<id>/check-output.txt` — legible to any human who opens it, invisible to
+every mechanism in the system. Most real verification failures have this shape:
+not missing evidence, but evidence nothing is looking at.
+
+The gate does defend against suppression, with a blocklist:
+
+```{bash}
+sed -n '14p' control/dr-gate.ts
+```
+
+Check `|| echo done anyway` against that list. Not `|| true`. Not a trailing
+`exit 0`. **It sails straight through**, and the gate would sign for it. A
+blocklist stops the suppression you thought of — which is the Session 4 lesson
+arriving early.
+
+### Q5 — Could the run act on a different worktree or version?
+
+*Open — working through this.*
+
+### Q6 — Is a non-functional quality missing?
+
+*Open — working through this.*
+
+---
+
+## Rules of revision
+
+1. Every exploit gets a revision **in the contract file**, not a verbal promise.
+   A loophole closed in conversation is still open in the run.
+2. Prefer a check or a `protect` entry over more adjectives. "Correctly" has
+   never stopped an agent.
+3. When the attacker runs dry, **freeze**. If execution later proves the contract
+   wrong, that is a new contract version, a new hash, and a new run — never an
+   edit in place. The gate enforces this:
+   `contract hash mismatch: contract changed after the run was opened`.
+
+---
+
+## My real task
+
+*To come — the contract for `tidycba2`, attacked with the same six questions,
+then revised and frozen.*
+
+---
+
+## Reset
+
+```{bash}
+find runs -mindepth 1 ! -name .gitkeep -delete 2>/dev/null
+find control/receipts -name '*.json' -delete 2>/dev/null
+cp control/checks/fixtures/solution-stub.mjs working/src/slugify.mjs
+git checkout -- working/test/slugify.test.mjs done/contract.yaml 2>/dev/null
+node --test working/test/slugify.test.mjs > /dev/null 2>&1
+echo "reset complete — candidate back to red (exit=$?), fixtures pristine"
+```

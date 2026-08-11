@@ -1,0 +1,5 @@
+run=s3-prep has a PENDING action dispatched but never recorded:
+  tool=run_check args={}
+The side effect may or may not have happened. Decide, then resume:
+  loop resume s3-prep --reconcile ok|failed|in_doubt
+  loop cancel s3-prep --reason "..."
