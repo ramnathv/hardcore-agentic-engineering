@@ -48,6 +48,7 @@ export interface EngineOptions {
   system: string;
   brief: string;
   checkCommand: string;
+  checkExpectedExit: number;
   tools?: string[]; // a subset of the catalog; default is the whole catalog
   // Stage-relative paths this lane's world does not contain — the sandbox
   // boundary a lesson draws around a worker. See ToolContext.hidden.
@@ -103,6 +104,7 @@ export async function runLive(options: EngineOptions): Promise<LiveRunView> {
       max_seconds: options.budget.maxSeconds,
       tools: specs.map((s) => s.name),
       check_command: options.checkCommand,
+      check_expected_exit: options.checkExpectedExit,
       ...(options.hidden?.length ? { hidden_paths: options.hidden } : {}),
     });
     // The manifest and the log must not be able to disagree about what this
@@ -217,6 +219,7 @@ export async function runLive(options: EngineOptions): Promise<LiveRunView> {
               stage,
               repoRoot: options.repoRoot,
               checkCommand: options.checkCommand,
+              checkExpectedExit: options.checkExpectedExit,
               allowed: options.tools,
               hidden: options.hidden,
               log,
@@ -319,6 +322,7 @@ export async function runProviderDriven(
       max_seconds: options.budget.maxSeconds,
       tools: specs.map((s) => s.name),
       check_command: options.checkCommand,
+      check_expected_exit: options.checkExpectedExit,
       ...(options.hidden?.length ? { hidden_paths: options.hidden } : {}),
       driver: 'provider',
     });
@@ -349,6 +353,7 @@ export async function runProviderDriven(
     stage,
     repoRoot: options.repoRoot,
     checkCommand: options.checkCommand,
+    checkExpectedExit: options.checkExpectedExit,
     allowed: options.tools,
     hidden: options.hidden,
     log,
@@ -424,6 +429,7 @@ export interface ToolDeps {
   stage: string;
   repoRoot: string;
   checkCommand: string;
+  checkExpectedExit: number;
   allowed?: string[];
   hidden?: string[];
   // Set once an interrupt has fired, so a run stops at the first matching
@@ -468,6 +474,7 @@ export function handleTool(
     stage: deps.stage,
     repoRoot: deps.repoRoot,
     checkCommand: deps.checkCommand,
+    checkExpectedExit: deps.checkExpectedExit,
     allowed: deps.allowed,
     hidden: deps.hidden,
     callId: request.callId,

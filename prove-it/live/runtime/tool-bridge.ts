@@ -25,6 +25,7 @@ export interface BridgeOptions {
   stage: string;
   repoRoot: string;
   checkCommand: string;
+  checkExpectedExit: number;
   // The subset of the catalog this lane may use. Absent means all of it.
   allowed?: string[];
   // Stage-relative paths outside this lane's view. See ToolContext.hidden.
@@ -121,6 +122,7 @@ function respond(socket: Socket, line: string, options: BridgeOptions, bridge: T
     stage: options.stage,
     repoRoot: options.repoRoot,
     checkCommand: options.checkCommand,
+    checkExpectedExit: options.checkExpectedExit,
     allowed: options.allowed,
     hidden: options.hidden,
     log: options.log,

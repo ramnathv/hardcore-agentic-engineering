@@ -95,7 +95,12 @@ function loadRun(runId: string) {
 
 function toolContext(runId: string, manifest: any): ToolContext {
   const { data } = loadContract(resolve(ROOT, manifest.contract_path));
-  return { runDir: runDirOf(runId), checkCommand: data.checks[0]?.command ?? 'false' };
+  const check = data.checks[0];
+  return {
+    runDir: runDirOf(runId),
+    checkCommand: check?.command ?? 'false',
+    checkExpectedExit: check?.expect_exit ?? 0,
+  };
 }
 
 let dispatchCount = 0;

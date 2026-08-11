@@ -20,7 +20,7 @@ import { makeArtifacts, makeStage } from './helpers.ts';
 
 const CHECK = 'node --test working/test/slugify.test.mjs';
 
-function harness() {
+function harness(checkCommand = CHECK, checkExpectedExit = 0) {
   const stage = makeStage();
   const evidence = makeArtifacts();
   prepareStageState(stage.path);
@@ -30,7 +30,8 @@ function harness() {
     const callId = `c${++seq}`;
     return {
       stage: stage.path,
-      checkCommand: CHECK,
+      checkCommand,
+      checkExpectedExit,
       callId,
       writeArtifact: lane.toolWriter(callId),
     };
@@ -160,6 +161,28 @@ test('run_check runs the contract command only, and never an agent argument', ()
   }
 });
 
+test('run_check accepts the nonzero exit status named by the contract', () => {
+  const h = harness('node -e "process.exit(1)"', 1);
+  try {
+    const result = h.call('run_check', {});
+    assert.equal(result.status, 'ok');
+    assert.match((result as any).summary, /exit 1 as contracted/);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('run_check reports exit 2 as inconclusive when the contract expects another status', () => {
+  const h = harness('node -e "process.exit(2)"', 0);
+  try {
+    const result = h.call('run_check', {});
+    assert.equal(result.status, 'failed');
+    assert.match((result as any).summary, /check inconclusive \(exit 2, expected exit 0\)/);
+  } finally {
+    h.cleanup();
+  }
+});
+
 test('full output goes to the artifact; the agent gets a bounded observation', () => {
   const h = harness();
   try {
@@ -282,6 +305,7 @@ test('a lane may be given part of the catalog, and the rest is refused', () => {
     const ctx = {
       stage: h.stage,
       checkCommand: CHECK,
+      checkExpectedExit: 0,
       callId: 'c-subset',
       allowed,
       writeArtifact: () => 'ref',
@@ -309,6 +333,7 @@ test('a hidden path is a sandbox boundary: refused both ways, and only there', (
     const ctx = {
       stage: h.stage,
       checkCommand: CHECK,
+      checkExpectedExit: 0,
       callId: 'c-hidden',
       hidden: ['working/test'],
       writeArtifact: () => 'ref',

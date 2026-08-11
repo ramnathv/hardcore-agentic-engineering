@@ -30,6 +30,7 @@ function run(stage: string, artifacts: any, requestGate: any, runId: string) {
     system: SYSTEM,
     brief: BRIEF,
     checkCommand: CHECK_COMMAND,
+    checkExpectedExit: 0,
     budget: { maxTurns: 8, maxSeconds: 120 },
     requestGate,
     onPresent: () => {},

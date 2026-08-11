@@ -26,6 +26,7 @@ import {
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve, sep } from 'node:path';
+import { assessCheckExit, checkSummary } from '../../control/check-exit.ts';
 import type { LiveToolResult, ToolSpec } from './protocol.ts';
 import { withGateRoot } from './gate-root.ts';
 
@@ -44,6 +45,7 @@ export interface ToolContext {
   // rules it judges by; nothing a worker asks for ever resolves here.
   repoRoot: string;
   checkCommand: string; // the one command locked in the contract
+  checkExpectedExit: number; // the status that satisfies that check
   callId: string;
   // The tools this lane may use. Absent means the whole catalog. Not
   // advertising a tool is not the same as refusing it: an agent can name a
@@ -305,13 +307,18 @@ const runCheck: ToolDef = {
     const artifact = ctx.writeArtifact('stdout.txt', stdout);
     ctx.writeArtifact('stderr.txt', stderr);
     const combined = (stdout + stderr).trim();
-    if (r.status === 0)
-      return { status: 'ok', summary: `check passed: ${ctx.checkCommand}`, artifact };
+    const assessment = assessCheckExit(r.status, ctx.checkExpectedExit);
+    if (assessment.accepted)
+      return {
+        status: 'ok',
+        summary: checkSummary(ctx.checkCommand, assessment),
+        artifact,
+      };
     const tail = combined.split('\n').slice(-24).join('\n');
     return {
       status: 'failed',
       summary: bound(
-        `check failed (exit ${r.status}): ${ctx.checkCommand}\n${tail}`,
+        `${checkSummary(ctx.checkCommand, assessment)}\n${tail}`,
         this.resultLimit,
         artifact,
       ),

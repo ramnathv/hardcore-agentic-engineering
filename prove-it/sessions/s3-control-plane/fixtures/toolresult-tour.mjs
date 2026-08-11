@@ -12,6 +12,7 @@ const ctx = {
   runDir: join(ROOT, 'runs', 's3-tour'),
   // A check that prints then fails: shows artifact retention + bounded observation.
   checkCommand: `node -e "for (let i = 1; i <= 40; i++) console.log('output line ' + i); console.error('assertion failed: expected rock-and-roll'); process.exit(1)"`,
+  checkExpectedExit: 0,
 };
 
 const show = (label, result) => {

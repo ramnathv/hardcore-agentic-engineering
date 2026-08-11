@@ -39,6 +39,7 @@ test('the manifest records what identifies a run, and nothing that identifies a 
       system: SYSTEM,
       brief: 'Make the check pass.',
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
       contractSha,
       workspaceHash: 'tree:abc123',
@@ -85,6 +86,7 @@ test('the lane keeps raw provider output, full tool output, and a transcript', a
       system: SYSTEM,
       brief: 'Make the check pass.',
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
 
@@ -132,6 +134,7 @@ test('a run_check keeps both streams, and the summary points at the retained one
       system: SYSTEM,
       brief: 'Make the check pass.',
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
     const laneDir = join(evidence.dir, 'shared');

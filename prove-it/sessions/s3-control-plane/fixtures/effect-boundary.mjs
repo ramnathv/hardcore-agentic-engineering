@@ -5,7 +5,7 @@
 // found in that same ledger. The network is simulated. The event boundary is
 // real and durable.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { EventLog } from '../../../src/events.ts';
 import { ROOT } from '../../../src/root.ts';
@@ -80,7 +80,45 @@ if (command === 'stage') {
     ...(status === 'failed' ? { retryable: true } : {}),
   });
   log.append('run.resumed', 'operator', { from_turn: 1 });
+  const artifact = opt('--artifact');
+  if (artifact) {
+    const operatorDir = join(artifact, 'operator');
+    mkdirSync(operatorDir, { recursive: true });
+    writeFileSync(
+      join(operatorDir, 'reconciliation-events.jsonl'),
+      readFileSync(eventFile, 'utf8'),
+    );
+  }
   console.log(`operator reconciliation: marked ${status}; observed ledger entries=${entries.length}`);
+} else if (command === 'observe') {
+  if (!existsSync(eventFile)) die(`no staged run '${runId}'`);
+  const entries = existsSync(ledgerFile)
+    ? readFileSync(ledgerFile, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    : [];
+  const matches = entries.filter((entry) => entry.to === 'ops');
+  const artifact = opt('--artifact');
+  if (artifact) {
+    const operatorDir = join(artifact, 'operator');
+    mkdirSync(operatorDir, { recursive: true });
+    writeFileSync(
+      join(operatorDir, 'world-observation.json'),
+      JSON.stringify(
+        {
+          source: 'simulated external payment ledger',
+          pending: { tool: 'send_payment', intent: 'ops-5' },
+          matching_entries: matches,
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+  }
+  console.log(
+    `world evidence: send_payment intent 'ops-5': ${matches.length} matching ledger entr${
+      matches.length === 1 ? 'y' : 'ies'
+    }`,
+  );
+  if (artifact) console.log('retained: operator/world-observation.json');
 } else {
-  die('usage: effect-boundary.mjs <stage|reconcile> --run-id <id> [--status <status>]');
+  die('usage: effect-boundary.mjs <stage|observe|reconcile> --run-id <id> [--status <status>] [--artifact <dir>]');
 }

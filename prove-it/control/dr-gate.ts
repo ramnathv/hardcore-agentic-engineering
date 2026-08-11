@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assessCheckExit, observedExit } from './check-exit.ts';
 
 const ROOT = process.env.PROVE_IT_ROOT || resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CTRL = join(ROOT, 'control');
@@ -126,10 +127,15 @@ if (cmd === 'check') {
     // today's contracts keep cwd = ROOT. Output is retained in the prove-it clone —
     // the student's repo is read and judged, never written to.
     const r = spawnSync('bash', ['-c', c.command], { cwd: port.candidateDir ? candidateDir : ROOT, encoding: 'utf8', env: { ...process.env, NODE_NO_WARNINGS: '1', NODE_TEST_CONTEXT: undefined, NODE_OPTIONS: undefined } });
-    results.push({ command: c.command, exit: r.status, expected: c.expect_exit });
+    const assessment = assessCheckExit(r.status, c.expect_exit);
+    results.push({ command: c.command, exit: r.status, expected: c.expect_exit, outcome: assessment.outcome });
     writeFileSync(join(runDir, 'check-output.txt'), (r.stdout || '') + (r.stderr || ''));
-    if (r.status !== c.expect_exit)
-      refuse(`check failed: '${c.command}' exited ${r.status}, expected ${c.expect_exit} (output in runs/${runId}/check-output.txt)`);
+    if (!assessment.accepted) {
+      const detail = assessment.outcome === 'inconclusive'
+        ? `check inconclusive: '${c.command}' returned ${observedExit(r.status)}, expected exit ${c.expect_exit}`
+        : `check failed: '${c.command}' exited ${r.status}, expected ${c.expect_exit}`;
+      refuse(`${detail} (output in runs/${runId}/check-output.txt)`);
+    }
   }
   const payload = {
     run_id: runId, contract_sha256: run.contract_sha256,

@@ -46,6 +46,14 @@ The path rules, exactly:
 - Leave both keys out and nothing changes: the contract gates `working/` exactly
   as before.
 
+Checks communicate through process exit status, not words in their output. The
+status in `expect_exit` means the contract clause is satisfied. This can be `1`
+for a check that proves a baseline is red. A check that cannot reach a verdict
+must exit `2`; the harness records it as `inconclusive` and the gate refuses it.
+Exit `2` is reserved, so do not use it as `expect_exit`. Any other unexpected
+status is `failed`. Stdout and stderr are retained as evidence, but they do not
+decide the result.
+
 `protect` does for your repo what `control/checks/manifest.json` does for the
 fixture: it pins the tests so the worker cannot pass by weakening them. Protect
 your test files, not your source — the source is supposed to change.
@@ -123,6 +131,8 @@ only then — records the run as completed.
 - Edit the contract after open: `contract hash mismatch` — no moved goalposts.
 - Edit a protected test: `protected check target modified` — no weakened checks.
 - `|| true` and friends in a check command: `suppressed check` — no muzzled checks.
+- A check that cannot decide exits `2`: `check inconclusive` — no green receipt
+  for an abstention.
 - Edit the candidate after the receipt: `receipt stale: candidate tree mismatch` —
   rerun `check`; the new receipt binds the new tree.
 - Write your own receipt: `not issued by this gate` — no signature, no completion.
