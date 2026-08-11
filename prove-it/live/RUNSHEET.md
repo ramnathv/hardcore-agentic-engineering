@@ -89,6 +89,15 @@ from the public mirror. It is local evidence, and it is the answer to any
 
 For Session 3, inspect the artifact in this order:
 
+```sh
+node scripts/s3-evidence.mjs
+node scripts/s3-evidence.mjs live/artifacts/<s3-directory>
+```
+
+The first command finds the newest Session 3 artifact. The viewer produces one
+projector-friendly after-action screen. Use the second command to show a
+specific run.
+
 1. `frames.txt` — the four claims each lane put on screen.
 2. `right.log` — the visible sequence: unknown state, refused resume, world
    observation, room decision, reconciliation, verdict.
