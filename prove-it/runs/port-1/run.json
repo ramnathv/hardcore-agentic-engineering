@@ -1,0 +1,29 @@
+{
+  "run_id": "port-1",
+  "contract_path": "projects/project-1-contract.yaml",
+  "contract_sha256": "b0f0114ade507e180a999da2fbd27a4a73f2963d22cce29d3edca6f223963c57",
+  "candidate_tree_start": "tree:ea8a9396f17175b70f33b6351ecee4f6b3092c373fd689658b5962467a612a7d",
+  "protected": {
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/helper.R": "28606e3feb06666cdde5a7ecee887950b3273cbfaedbc35fdc7c00ce46dcd1af",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-config.R": "846ceb9d4c530ba8297e4ee4685ce52865fe7f1dc631b70b64ea5669ca7ddaf7",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-connection.R": "bec0c25a7539f222439fb9490a7bed02bac495835dbc8820f65bec8da6cbdad4",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-extension.R": "f69d4c4a84cac55fc1ddd4889226210afce1d2450a1f675f2c26278d9798ccb3",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-introspect.R": "ecc8caa9b3685565d3e3513a8578ff712737e999f4082ea359535eb4b63a22aa",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-objects.R": "878a2ce94c7bfc0f14cd4c125af90832e99574b9586c1e3573b9a152a864b1ed",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-read-formats.R": "bf38bf790069077c91fc3c02d0335a685d6e9e735111c6203dc02b3ad99ab59f",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-read.R": "92c459a11646cbea569353d4f3cda7b0aac2b0bf14ca9d3e6b47aa6647a7115b",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-register.R": "07f404a23bed12f9e70f14089d728aa654f1cc2e4056ad044d8433e4bcee787a",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-secret.R": "1146ad31c7cb0e8b47e87ce3f32571a3f18130460686c5a6913ef8d682604e1a",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-spatial.R": "c7abf7c4d2081d4d519cd7e093e48ec4999a1e3e59c302d28686d5e259c250b2",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-sql.R": "0531175d3159650d70c64716cfd2ce8be4202086067fe76d461bbf73780a9203",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-utils.R": "cb35bc071e564ec30d4fcb14f0bb8deb6f9d04e0608392a959296e413007a04c",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-workspace.R": "38c15884388272a7124c41fd5239fb8decf4a49f1eb246e943a1f6f40b6d0251",
+    "/Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-write.R": "08d5674cbb0af6125263e09a339b3284089c969fc8ef994181b7c5d7e41d687c"
+  },
+  "provider": "none",
+  "budgets": {
+    "attempts": 3,
+    "elapsed_minutes": 30
+  },
+  "created_at": "2026-08-11T21:35:00.407Z"
+}

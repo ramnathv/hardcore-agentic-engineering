@@ -1,0 +1,68 @@
+# Done Contract — duckddl D1: duck_parquet_meta() -> duck_parquet_metadata()
+#
+# Ported (see PORT.md): the gate judges duckddl, which is read and hashed,
+# never written to. Runs and receipts stay in this prove-it clone.
+# Absolute paths throughout, because this file does not sit beside the repo it
+# gates.
+#
+# Baseline: duckddl @ the commit where tests/testthat/test-introspect.R already
+# calls the NEW name. The suite is red on purpose — 183 pass, 1 error — because
+# the function does not exist yet. The agent's job is to make a pinned test pass.
+outcome: duckddl exports duck_parquet_metadata() and no longer exports duck_parquet_meta(), the full test suite passes with no skips, and no tracked file outside NEWS.md still names the old function
+candidate_dir: /Users/ramnath/Documents/github.com/ramnathv/duckddl
+# protect: pinned by sha256 at `loop open`, re-verified at check and verify.
+# This is the ONLY mechanism with force — must_not_change below is documentation.
+# All 15 files: the agent must make the pinned test pass, never edit it.
+protect:
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/helper.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-config.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-connection.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-extension.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-introspect.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-objects.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-read-formats.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-read.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-register.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-secret.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-spatial.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-sql.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-utils.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-workspace.R
+  - /Users/ramnath/Documents/github.com/ramnathv/duckddl/tests/testthat/test-write.R
+# Ordered fast-to-slow: a cheap check fails first, and the slow one runs last so
+# that a SUCCESSFUL run leaves the test tally in check-output.txt. The gate
+# overwrites that file per check, so only the last one to run survives.
+checks:
+  - command: Rscript -e 'suppressMessages(devtools::load_all(quiet=TRUE)); e <- getNamespaceExports("duckddl"); cat("exports:", length(e), "\n"); stopifnot("duck_parquet_metadata" %in% e, !("duck_parquet_meta" %in% e), length(e)==41L)'
+    expect_exit: 0
+  - command: f=$(git grep -lP "duck_parquet_meta\b" -- ":!NEWS.md"); if [ -n "$f" ]; then echo "stale references remain:"; echo "$f"; exit 1; fi; echo "no stale references"
+    expect_exit: 0
+  - command: Rscript -e 'suppressMessages(devtools::load_all(quiet=TRUE)); r <- as.data.frame(testthat::test_local(reporter="silent", stop_on_failure=FALSE)); cat(sprintf("pass=%d fail=%d skip=%d error=%d\n", sum(r$passed), sum(r$failed), sum(r$skipped), sum(r$error))); stopifnot(sum(r$failed)==0, sum(r$error)==0, sum(r$skipped)==0, sum(r$passed)==185L)'
+    expect_exit: 0
+runtime_observation:
+  - man/duck_parquet_meta.Rd is renamed on disk, not merely rewritten — the stale-reference check reads file CONTENTS, so an orphaned filename survives it
+  - pkgdown::build_site() still succeeds; the reference index errors when a listed topic disappears
+  - NEWS.md gains an entry recording the rename, and is the one tracked file allowed to keep the old name
+must_change:
+  - R/introspect.R
+  - NAMESPACE
+  - man/
+  - README.md
+  - README.Rmd
+  - ROADMAP.md
+  - CLAUDE.md
+# DECLARATIVE ONLY. The gate parses must_not_change and never reads it again
+# (grep -c must_not_change control/dr-gate.ts -> 0). Everything that must
+# actually hold is in protect: or checks: above. Kept here as intent for a
+# human reader, not as enforcement.
+must_not_change:
+  - tests/testthat/
+  - the 40 other exported functions and their behaviour
+budgets:
+  attempts: 3
+  elapsed_minutes: 30
+stop_and_ask:
+  - any need to edit anything under tests/testthat/
+  - the rename cannot be completed without changing behaviour, not just names
+  - a caller of duck_parquet_meta() exists that this contract did not anticipate
+release_owner: human
