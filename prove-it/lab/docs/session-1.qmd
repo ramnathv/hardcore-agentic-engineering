@@ -234,8 +234,18 @@ not missing evidence, but evidence nothing is looking at.
 The gate does defend against suppression, with a blocklist:
 
 ```{bash}
-sed -n '14p' control/dr-gate.ts
+grep -n "^const SUPPRESS" control/dr-gate.ts
 ```
+
+::: {.callout-note collapse="true"}
+## Why `grep`, not `sed -n '14p'`
+
+This chunk originally cited the line by number. An upstream commit inserted a
+line above it and the citation silently began printing the gate key instead —
+still a valid chunk, still rendering, quietly wrong.
+
+Line numbers are not stable identifiers. Cite by content.
+:::
 
 Check `|| echo done anyway` against that list. Not `|| true`. Not a trailing
 `exit 0`. **It sails straight through**, and the gate would sign for it. A
@@ -249,6 +259,34 @@ arriving early.
 ### Q6 — Is a non-functional quality missing?
 
 *Open — working through this.*
+
+---
+
+## A third outcome: `inconclusive`
+
+Upstream added `control/check-exit.ts`, which gives every check three possible
+outcomes rather than two:
+
+```{bash}
+grep -nE "CheckExitOutcome =|INCONCLUSIVE_CHECK_EXIT" control/check-exit.ts
+```
+
+Exit **2** is the conventional "the check could not reach a verdict" — the
+command did not run, the interpreter died, the file was missing. That is
+different from "the check ran and the answer was no."
+
+The gate stays binary: only `satisfied` is accepted. But the refusal now says
+which happened:
+
+```
+check failed:       '<cmd>' exited 1, expected 0
+check inconclusive: '<cmd>' returned 2, expected exit 0
+```
+
+Worth knowing for my own card, where the honest starting state is exit **1** —
+the check ran and said no. A task whose check exits 2 today is a task whose
+check cannot run at all, and that is a weaker starting position: it proves the
+harness is missing, not that the work is undone.
 
 ---
 
