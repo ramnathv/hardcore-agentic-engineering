@@ -9,6 +9,7 @@
 //   node live/runtime/cli.ts steer <artifact-dir> --text "the correction"
 //   node live/runtime/cli.ts audit <artifact-dir> --expect "text"
 //   node live/runtime/cli.ts view <artifact-dir> [--details]
+//   node live/runtime/cli.ts inspect-pending <artifact-dir>
 //   node live/runtime/cli.ts reconcile <artifact-dir> --decision ok|failed|in_doubt
 //                                                     [--note "what you saw"]
 //   node live/runtime/cli.ts resume <artifact-dir>
@@ -38,7 +39,7 @@ import { claudeCli, structuredDecision } from '../providers/claude-cli.ts';
 import { codexCli } from '../providers/codex-cli.ts';
 import { ProviderUnavailable } from '../providers/provider.ts';
 import { smokeProvider, type SmokeScript } from '../providers/smoke.ts';
-import { ArtifactSet, artifactDir } from './artifacts.ts';
+import { ArtifactSet, artifactDir, sanitize } from './artifacts.ts';
 import { runLive, runProviderDriven } from './engine.ts';
 import { socketPathFor, startToolBridge } from './tool-bridge.ts';
 import { copyPrefix, LiveEventLog, readLiveEvents } from './event-log.ts';
@@ -54,6 +55,7 @@ import {
 import { reduce } from './run-view.ts';
 import { STAGE_MARKER } from './tool-catalog.ts';
 import { withGateRoot } from './gate-root.ts';
+import { parseContract } from '../../src/contract.ts';
 
 const LIVE = dirname(dirname(fileURLToPath(import.meta.url)));
 const ROOT = resolve(LIVE, '..');
@@ -196,11 +198,15 @@ function gateRunIdFor(stage: string, runId: string): string {
   return opened.length === 1 ? opened[0] : runId;
 }
 
-function contractFor(stage: string): { sha: string; check: string } {
+function contractFor(stage: string): { sha: string; check: string; expectedExit: number } {
   const raw = readFileSync(join(stage, 'done', 'contract.yaml'), 'utf8');
-  const check = raw.match(/^\s+-\s+command:\s*(.+)$/m)?.[1].trim();
+  const check = parseContract(raw).checks[0];
   if (!check) die('the contract declares no check command');
-  return { sha: createHash('sha256').update(raw).digest('hex'), check };
+  return {
+    sha: createHash('sha256').update(raw).digest('hex'),
+    check: check.command,
+    expectedExit: check.expect_exit,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -336,6 +342,7 @@ async function smoke(): Promise<void> {
     system: SYSTEM,
     brief: BRIEFS[script],
     checkCommand: contract.check,
+    checkExpectedExit: contract.expectedExit,
     budget: { maxTurns: 8, maxSeconds: 300 },
     contractSha: contract.sha,
     requestGate: gated ? gateRequest(stage) : undefined,
@@ -455,6 +462,7 @@ async function claude(): Promise<void> {
     run_id: runId,
     stage,
     task,
+    brief,
     requested_model: model,
     gated,
     ...(gateRunId ? { gate_run_id: gateRunId } : {}),
@@ -499,6 +507,7 @@ async function claude(): Promise<void> {
       system: SYSTEM,
       brief,
       checkCommand: contract.check,
+      checkExpectedExit: contract.expectedExit,
       budget: { maxTurns: 40, maxSeconds: Number(opt('--timeout') ?? 300) },
       // A lane may be given only part of the catalog. What a lane can see is
       // as much a control as what it is told.
@@ -507,7 +516,14 @@ async function claude(): Promise<void> {
       contractSha: contract.sha,
       requestGate: gated ? gateRequest(stage, gateRunId) : undefined,
       onPresent: render,
-      startBridge: (deps) => startToolBridge({ ...deps, stage, repoRoot: ROOT, checkCommand: contract.check }),
+      startBridge: (deps) =>
+        startToolBridge({
+          ...deps,
+          stage,
+          repoRoot: ROOT,
+          checkCommand: contract.check,
+          checkExpectedExit: contract.expectedExit,
+        }),
     });
   } catch (error) {
     if (error instanceof ProviderUnavailable) die(error.message);
@@ -635,6 +651,53 @@ function reconcile(): void {
   console.log(`\nresume with:\n  node live/runtime/cli.ts resume ${dir}`);
 }
 
+// Read the external system before the operator decides how to reconcile a
+// pending action. This command is deliberately separate from `reconcile`: an
+// observation is evidence, not a decision, and the harness must not turn one
+// into the other without a human.
+function inspectPending(): void {
+  const dir = argv[1] ?? die('inspect-pending <artifact-dir>');
+  const manifestPath = join(dir, 'manifest.json');
+  if (!existsSync(manifestPath)) die(`no manifest under ${dir}`);
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const eventsPath = join(dir, 'shared', 'events.jsonl');
+  if (!existsSync(eventsPath)) die(`no lane events under ${dir}`);
+  const pending = reduce(readLiveEvents(eventsPath)).pending;
+  if (!pending) die('the run has no pending action to inspect');
+  if (pending.tool !== 'send_payment')
+    die(`no world inspector is registered for pending tool '${pending.tool}'`);
+
+  const intent = String(pending.args.intent ?? '');
+  if (!intent) die('the pending send_payment action has no intent');
+  const stage = manifest.stage as string;
+  if (!stage || !existsSync(stage)) die(`the stage for this run is gone: ${stage ?? '(none)'}`);
+  const ledger = join(stage, 'live-state', 'ledger.jsonl');
+  const entries = existsSync(ledger)
+    ? readFileSync(ledger, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+    : [];
+  const matches = entries.filter((entry) => entry.intent === intent);
+  const observation = {
+    source: 'external payment ledger',
+    pending: { tool: pending.tool, intent, idempotency_key: pending.idempotencyKey },
+    matching_entries: matches,
+  };
+  const operatorDir = join(dir, 'operator');
+  mkdirSync(operatorDir, { recursive: true });
+  writeFileSync(
+    join(operatorDir, 'world-observation.json'),
+    sanitize(JSON.stringify(observation, null, 2)) + '\n',
+  );
+  console.log(
+    `world evidence: ${pending.tool} intent '${intent}': ${matches.length} matching ledger entr${
+      matches.length === 1 ? 'y' : 'ies'
+    }`,
+  );
+  console.log('retained: operator/world-observation.json');
+}
+
 async function resume(): Promise<void> {
   const dir = argv[1] ?? die('resume <artifact-dir>');
   const manifestPath = join(dir, 'manifest.json');
@@ -662,7 +725,7 @@ async function resume(): Promise<void> {
   artifacts.updateManifest({
     run_id: manifest.run_id,
     stage,
-    ...(isClaude ? { task: manifest.task } : { smoke_script: script }),
+    ...(isClaude ? { task: manifest.task, brief: manifest.brief } : { smoke_script: script }),
     gated,
     // Carried explicitly: the ArtifactSet constructor rewrites the manifest,
     // and a second resume still has to know which run the gate can find.
@@ -720,8 +783,9 @@ async function resume(): Promise<void> {
       artifacts,
       session,
       system: SYSTEM,
-      brief: isClaude ? CLAUDE_BRIEFS[manifest.task] : BRIEFS[script],
+      brief: isClaude ? manifest.brief ?? CLAUDE_BRIEFS[manifest.task] : BRIEFS[script],
       checkCommand: contract.check,
+      checkExpectedExit: contract.expectedExit,
       budget: { maxTurns: isClaude ? 40 : 8, maxSeconds: 300 },
       contractSha: contract.sha,
       resumeInstruction: round === 1 ? instruction : undefined,
@@ -737,7 +801,14 @@ async function resume(): Promise<void> {
       if (isClaude)
         await runProviderDriven({
           ...shared,
-          startBridge: (deps) => startToolBridge({ ...deps, stage, repoRoot: ROOT, checkCommand: contract.check }),
+          startBridge: (deps) =>
+            startToolBridge({
+              ...deps,
+              stage,
+              repoRoot: ROOT,
+              checkCommand: contract.check,
+              checkExpectedExit: contract.expectedExit,
+            }),
         });
       else await runLive(shared);
     } catch (error) {
@@ -772,6 +843,7 @@ else if (command === 'view') printView(argv[1] ?? die('view <artifact-dir>'));
 else if (command === 'fork') fork();
 else if (command === 'steer') steer();
 else if (command === 'audit') audit();
+else if (command === 'inspect-pending') inspectPending();
 else if (command === 'reconcile') reconcile();
 else if (command === 'resume') await resume();
-else die('usage: cli.ts <smoke|claude|fork|steer|audit|view|reconcile|resume> …  (see the file header)');
+else die('usage: cli.ts <smoke|claude|fork|steer|audit|view|inspect-pending|reconcile|resume> …  (see the file header)');

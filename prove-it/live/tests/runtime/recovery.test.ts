@@ -131,7 +131,18 @@ test('stopping after the side effect is the S3 state: paid, unrecorded, blocked'
     assert.equal(blind.status, 2, 'a bare resume fails');
     assert.match(blind.stderr, /invoice-4021-attempt-1/, 'the operator is shown the key');
 
-    // The operator looks at the world and records what they found.
+    // Looking and deciding are separate operator actions. The observation is
+    // retained before the decision enters the durable event log.
+    const observed = cli(['inspect-pending', dir]);
+    assert.equal(observed.status, 0, observed.stderr);
+    assert.match(observed.stdout, /invoice-4021.*1 matching ledger entry/);
+    const observation = JSON.parse(
+      readFileSync(join(dir, 'operator', 'world-observation.json'), 'utf8'),
+    );
+    assert.equal(observation.pending.intent, 'invoice-4021');
+    assert.equal(observation.matching_entries.length, 1);
+
+    // The operator records the conclusion supported by that observation.
     const recorded = cli(['reconcile', dir, '--decision', 'ok', '--note', 'one entry in the ledger']);
     assert.equal(recorded.status, 0, recorded.stderr);
 

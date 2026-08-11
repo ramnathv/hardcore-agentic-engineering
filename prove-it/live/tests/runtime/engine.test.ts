@@ -30,6 +30,7 @@ test('a multi-turn smoke run drives the workspace from red to green', async () =
       system: SYSTEM,
       brief: BRIEF,
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
 
@@ -62,6 +63,7 @@ test('every tool result completes the round trip back to the adapter', async () 
       system: SYSTEM,
       brief: BRIEF,
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
 
@@ -103,6 +105,7 @@ test('a refusal is returned to the agent and the turn continues', async () => {
       system: SYSTEM,
       brief: 'Establish what you may read.',
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
 
@@ -141,6 +144,7 @@ test('the run view rebuilds identically from the events alone', async () => {
       system: SYSTEM,
       brief: BRIEF,
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
     });
 
@@ -179,6 +183,7 @@ test('a provider failure stops the lane and never starts a replay', async () => 
       system: SYSTEM,
       brief: BRIEF,
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 8, maxSeconds: 120 },
       onPresent: (event) => seen.push(event),
     });
@@ -209,6 +214,7 @@ test('the turn budget is a hard stop, not a suggestion', async () => {
       system: SYSTEM,
       brief: BRIEF,
       checkCommand: CHECK_COMMAND,
+      checkExpectedExit: 0,
       budget: { maxTurns: 2, maxSeconds: 120 },
     });
     assert.equal(view.status, 'failed');

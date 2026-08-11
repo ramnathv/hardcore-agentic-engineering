@@ -7,7 +7,11 @@ import { join } from 'node:path';
 import { ROOT } from './root.ts';
 import { dispatch, type ToolContext, type ToolResult } from './tools.ts';
 
-const ctx: ToolContext = { runDir: join(ROOT, 'runs', 'probe'), checkCommand: 'true' };
+const ctx: ToolContext = {
+  runDir: join(ROOT, 'runs', 'probe'),
+  checkCommand: 'true',
+  checkExpectedExit: 0,
+};
 
 type Label = 'contained' | 'refused' | 'allowed' | 'unsupported';
 

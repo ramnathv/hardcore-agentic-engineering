@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { basename, dirname, join, resolve, sep } from 'node:path';
+import { assessCheckExit, checkSummary } from '../control/check-exit.ts';
 import { ROOT } from './root.ts';
 
 export type ToolResult =
@@ -21,6 +22,7 @@ export type ToolResult =
 export interface ToolContext {
   runDir: string; // where artifacts (full outputs) are retained
   checkCommand: string; // the contract's named check — the only allowlisted command
+  checkExpectedExit: number; // the status that satisfies that check
 }
 
 const CREDENTIAL_PATTERN = /gate\.key|\.ssh|id_rsa|fake-home|\.aws|credentials/;
@@ -94,11 +96,16 @@ export function dispatch(
       const artifact = join(ctx.runDir, `tool-output-${++artifactSeq}.txt`);
       writeFileSync(artifact, out); // full output retained; observation stays bounded
       const tail = out.trim().split('\n').slice(-8).join('\n');
-      if (r.status === 0)
-        return { status: 'ok', summary: `check passed: ${ctx.checkCommand}`, artifact };
+      const assessment = assessCheckExit(r.status, ctx.checkExpectedExit);
+      if (assessment.accepted)
+        return {
+          status: 'ok',
+          summary: checkSummary(ctx.checkCommand, assessment),
+          artifact,
+        };
       return {
         status: 'failed',
-        summary: `check failed (exit ${r.status}): ${ctx.checkCommand}\n${tail}`,
+        summary: `${checkSummary(ctx.checkCommand, assessment)}\n${tail}`,
         retryable: true,
         artifact,
       };

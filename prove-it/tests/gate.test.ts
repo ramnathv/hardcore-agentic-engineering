@@ -84,3 +84,59 @@ test('old receipt + changed working tree prints "receipt stale: candidate tree m
     cleanup();
   }
 });
+
+test('the gate accepts a nonzero exit status when the contract names it', () => {
+  const { root, cleanup } = makeFixtureRoot();
+  try {
+    const contractPath = join(root, 'done', 'contract.yaml');
+    const contract = readFileSync(contractPath, 'utf8').replace(
+      '  - command: node --test working/test/slugify.test.mjs\n    expect_exit: 0',
+      '  - command: node -e "process.exit(1)"\n    expect_exit: 1',
+    );
+    writeFileSync(contractPath, contract);
+
+    const run = loop(root, ['run', '--provider', 'smoke', '--run-id', 'expected-one']);
+    assert.equal(run.status, 0, run.out);
+    assert.match(run.out, /check passed \(exit 1 as contracted\)/);
+    const result = gate(root, ['check', 'expected-one']);
+
+    assert.equal(result.status, 0, result.out);
+    const receipt = JSON.parse(
+      readFileSync(join(root, 'control', 'receipts', 'expected-one.json'), 'utf8'),
+    );
+    assert.deepEqual(receipt.checks[0], {
+      command: 'node -e "process.exit(1)"',
+      exit: 1,
+      expected: 1,
+      outcome: 'satisfied',
+    });
+  } finally {
+    cleanup();
+  }
+});
+
+test('the gate refuses exit 2 as inconclusive when the contract expects another status', () => {
+  const { root, cleanup } = makeFixtureRoot();
+  try {
+    const contractPath = join(root, 'done', 'contract.yaml');
+    const contract = readFileSync(contractPath, 'utf8').replace(
+      '  - command: node --test working/test/slugify.test.mjs\n    expect_exit: 0',
+      '  - command: node -e "console.error(\'unavailable\'); process.exit(2)"\n' +
+        '    expect_exit: 0',
+    );
+    writeFileSync(contractPath, contract);
+
+    assert.equal(loop(root, ['open', '--run-id', 'inconclusive']).status, 0);
+    const result = gate(root, ['check', 'inconclusive']);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.out, /check inconclusive: .* returned exit 2, expected exit 0/);
+    assert.equal(
+      readFileSync(join(root, 'runs', 'inconclusive', 'check-output.txt'), 'utf8'),
+      'unavailable\n',
+      'the explanation is retained as evidence, but the exit status decides the outcome',
+    );
+  } finally {
+    cleanup();
+  }
+});

@@ -32,18 +32,20 @@ const BOUNDARY = 'node sessions/s3-control-plane/fixtures/effect-boundary.mjs';
 const CLI = 'node live/runtime/cli.ts';
 const PREFIX_ART = '{{artifact}}/prefix';
 const CRASH = 'PROVE_IT_LIVE_CRASH_AT=after_effect PROVE_IT_LIVE_CRASH_AT_TOOL=send_payment';
+const PAYMENT_BRIEF =
+  'Pay intent ops-5 for 5 USD. It must be paid exactly once. Confirm the final state before you say you are done.';
 // Both modes report the verdict in one vocabulary, so the battery asserts the
 // same thing whether a fixture or an agent produced it.
 const LEDGER_ASSERT = (run: string) =>
   `node -e "const f=(process.env.TMPDIR||require('os').tmpdir())+'/prove-it-live/${run}/live-state/ledger.jsonl';` +
-  `const c=require('fs').existsSync(f)?require('fs').readFileSync(f,'utf8').trim().split('\\n').filter(Boolean).length:0;` +
-  `console.log('ledger: '+(c===1?'PASS':'FAIL')+' — '+c+' entr'+(c===1?'y':'ies')+' for one intent')"`;
+  `const c=require('fs').existsSync(f)?require('fs').readFileSync(f,'utf8').trim().split('\\n').filter(Boolean).map(JSON.parse).filter(e=>e.intent==='ops-5').length:0;` +
+  `console.log('ledger: '+(c===1?'PASS':'FAIL')+' — '+c+' entr'+(c===1?'y':'ies')+' for intent ops-5')"`;
 
 // The one intent both lanes recover from — the input the worker was executing
 // when the process died.
 const INTENT_INPUT =
   'intent: ops-5\n' +
-  'action: send_payment(to: ops, amount: 5)\n' +
+  'action: send_payment(intent: ops-5, amount: 5 USD)\n' +
   'goal: Pay the ops ledger exactly once.\n' +
   'state: The worker dispatched the action. The process died before it recorded a result.';
 
@@ -57,15 +59,15 @@ const scenario: Scenario = {
   allowedCausalDifference:
     'The left lane keeps no durable record and has no tool that can inspect the world. The right lane keeps the record and reconciles against it before resuming.',
   pause: {
-    question: 'You looked at the world. What can you truthfully record?',
+    question: 'The run says unknown; the ledger shows one matching payment. What can you truthfully record?',
     kind: 'menu',
-    options: ['ok'],
+    options: ['ok', 'failed', 'in_doubt'],
     default: 'ok',
   },
   evidenceNote:
     'left: a staged crash, a lost confirmation, a blind re-send, and two ledger entries for one intent · right: the same crash, needs_reconcile on screen, a refused bare resume, an operator reconciliation in the log, and exactly one entry',
   artifactNote:
-    'the log records what the operator said they saw, never the looking itself — and the ledger is a file standing in for a network service; the at-least-once boundary is real, the network is not.',
+    'right.log retains the observation before the decision. The operator artifact retains the matching ledger record; the mock reconciliation-events.jsonl or live right/shared/events.jsonl retains the decision. The ledger is a file standing in for a network service; the at-least-once boundary is real, the network is not.',
   expectedVerdicts: {
     left: 'ledger: FAIL',
     right: 'ledger: PASS',
@@ -86,6 +88,7 @@ const scenario: Scenario = {
       mockCmd: `${BOUNDARY} stage --run-id {{runid}}`,
       realCmd:
         `${CRASH} ${CLI} claude --task payment ` +
+        `--brief "${PAYMENT_BRIEF}" ` +
         `--run-id {{shared}} --artifact ${PREFIX_ART} --timeout 240; ` +
         `${CLI} fork --from ${PREFIX_ART} --to {{artifact}}/left --run-id {{runid}} --drop-events`,
       signals: 'prefix',
@@ -100,11 +103,12 @@ const scenario: Scenario = {
     {
       lane: 'left',
       frame: 'CONTROL',
-      extract: 'sent: entry #2|payment recorded for invoice-4021',
+      extract: 'sent: entry #2|payment recorded for ops-5',
       say: 'It goes looking for state, finds nothing that answers, and pays again.',
       mockCmd: `${LEDGER} send --to ops --amount 5 --ledger runs/{{runid}}-ledger.jsonl`,
       realCmd:
         `${CLI} claude --task payment --run-id {{runid}} ` +
+        `--brief "${PAYMENT_BRIEF}" ` +
         `--reuse-stage \${TMPDIR:-/tmp}/prove-it-live/{{runid}} --artifact {{artifact}}/left ` +
         `--tools read_file,write_file,run_check,send_payment --timeout 240`,
     },
@@ -143,13 +147,20 @@ const scenario: Scenario = {
       mockCmd: 'node src/loop.ts resume {{runid}} || true',
       realCmd: `${CLI} resume {{artifact}}/right || true`,
     },
+    {
+      lane: 'right',
+      showOutput: true,
+      say: 'Now the operator inspects the external ledger. This is evidence about the world, not a result the crashed process recorded.',
+      mockCmd: `${BOUNDARY} observe --run-id {{runid}} --artifact {{artifact}}`,
+      realCmd: `${CLI} inspect-pending {{artifact}}/right`,
+    },
     { lane: 'right', pause: true },
     {
       lane: 'right',
       showOutput: true,
       say: 'The operator records what they saw: {{answer}}. Then the run resumes.',
       mockCmd:
-        `${BOUNDARY} reconcile --run-id {{runid}} --status {{answer}} && ` +
+        `${BOUNDARY} reconcile --run-id {{runid}} --status {{answer}} --artifact {{artifact}} && ` +
         'grep reconciliation runs/{{runid}}/events.jsonl',
       realCmd:
         `${CLI} reconcile {{artifact}}/right --decision {{answer}} ` +

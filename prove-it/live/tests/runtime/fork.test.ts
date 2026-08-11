@@ -39,6 +39,7 @@ async function makePrefix(runId: string) {
     system: SYSTEM,
     brief: 'Pay invoice-4021 exactly once.',
     checkCommand: CHECK_COMMAND,
+    checkExpectedExit: 0,
     budget: { maxTurns: 8, maxSeconds: 120 },
   });
   // The manifest is what fork() reads to find the world.

@@ -8,6 +8,7 @@ provider, or network.
 
 ```sh
 cd course/prove-it
+node --version                     # must be 22.18 or newer
 bash scripts/live-qa.sh mock       # the keyless battery, ~1 minute
 claude --version                   # the provider must be on PATH
 ```
@@ -85,3 +86,29 @@ and anything key-shaped are scrubbed on the way in.
 That directory is git-ignored, excluded from the course site build, and excluded
 from the public mirror. It is local evidence, and it is the answer to any
 "what actually happened" the room asks.
+
+For Session 3, inspect the artifact in this order:
+
+```sh
+node scripts/s3-evidence.mjs
+node scripts/s3-evidence.mjs live/artifacts/<s3-directory>
+```
+
+The first command finds the newest Session 3 artifact. The viewer produces one
+projector-friendly after-action screen. Use the second command to show a
+specific run.
+
+1. `frames.txt` — the four claims each lane put on screen.
+2. `right.log` — the visible sequence: unknown state, refused resume, world
+   observation, room decision, reconciliation, verdict.
+3. `operator/world-observation.json` in mock mode, or
+   `right/operator/world-observation.json` in live mode — what the ledger
+   actually returned before the decision.
+4. `decision.txt` — what the room classified that evidence as.
+5. `operator/reconciliation-events.jsonl` in mock mode, or
+   `right/shared/events.jsonl` in live mode — where the operator decision
+   entered durable run history. For a live run, render the full history with
+   `node scripts/timeline.mjs live/artifacts/<s3-directory>`.
+
+The important seam is between steps 3 and 4. The read reports what the world
+contains. The operator decides what that evidence permits the run to record.
