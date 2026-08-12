@@ -38,6 +38,10 @@ steps. The whole harness is 5 commands.
 Shorthands: `npm run green`, `npm run smoke`, `npm run tamper`, `npm run probe`,
 `npm test`.
 
+If the source feels larger than these five commands, open
+[How the `prove-it` source works](SOURCE-GUIDE.md). It shows the eight files,
+one complete run and the parts the starter does not supply yet.
+
 The idea in one paragraph: a run completes only when `dr-gate` reruns the
 agreed checks and signs a receipt. The gate refuses forged, replayed and stale
 receipts. A receipt proves the checks ran — not that they were adequate. The
